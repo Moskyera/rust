@@ -15,6 +15,11 @@ if not exist hacash.exe (
 taskkill /IM hacash.exe /F >nul 2>&1
 timeout /t 2 /nobreak >nul
 
+if exist hacash_hip25_demo (
+    echo Removing old chain data ^(fresh testnet seed^)...
+    rmdir /s /q hacash_hip25_demo
+)
+
 (
 echo [default]
 echo data_dir = hacash_hip25_demo
@@ -32,6 +37,7 @@ echo chain_id = 1
 echo staking_activation_height = 1
 echo hip25_testnet_seed = true
 echo hip25_testnet_seed_password = hip25test
+echo hip25_testnet_demo_periods = true
 echo [miner]
 echo enable = true
 echo reward = 1Do17BuqMj5N4EZRuquXtoCCHFZpQoHyc2
@@ -62,10 +68,22 @@ powershell -NoProfile -Command "try { Invoke-RestMethod 'http://127.0.0.1:8083/q
 if errorlevel 1 goto waitrpc
 echo       RPC ready.
 
-echo [3/3] Starting HIP25-POWORKER...
+echo [3/4] Starting HIP25-POWORKER...
 start "HIP25-POWORKER" cmd /k "cd /d %cd% && title HIP25-POWORKER && hacash.exe poworker"
 
-timeout /t 2 /nobreak >nul
+echo [4/4] Waiting for block 1 ^(HACD seed, max 90s^)...
+set /a tries=0
+:waitblock
+set /a tries+=1
+if %tries% gtr 90 goto blockwarn
+timeout /t 1 /nobreak >nul
+powershell -NoProfile -Command "try { $r = Invoke-RestMethod 'http://127.0.0.1:8083/query/latest' -TimeoutSec 2; if ([int]$r.height -ge 1) { exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>&1
+if errorlevel 1 goto waitblock
+echo       Block 1 ready — 5 HACD seeded.
+goto openwallet
+:blockwarn
+echo       Block 1 not mined yet — wallet will auto-retry.
+:openwallet
 start http://127.0.0.1:8083/hip25/wallet
 
 echo.

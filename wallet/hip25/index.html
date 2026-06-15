@@ -120,6 +120,7 @@
     .badge-Staked { background: #2e2640; color: var(--purple); }
     .badge-Cooldown { background: #3d3020; color: var(--amber); }
     .badge-unknown { background: #333; color: var(--muted); }
+    .badge-Loading { background: #243044; color: var(--muted); }
     .literal { font-family: ui-monospace, monospace; font-weight: 600; letter-spacing: 0.05em; }
     .meta { font-size: 0.75rem; color: var(--muted); }
     #log {
@@ -216,6 +217,21 @@
 
     const $ = (id) => document.getElementById(id);
     const state = { diamonds: [], height: 0, selected: new Set(), wasm: null };
+    let loadRetryTimer = null;
+
+    function schedulePortfolioRetry() {
+      if (loadRetryTimer) return;
+      loadRetryTimer = setTimeout(() => {
+        loadRetryTimer = null;
+        loadPortfolio({ retry: true }).catch((e) => log(e.message, "err"));
+      }, 2000);
+    }
+
+    function clearPortfolioRetry() {
+      if (!loadRetryTimer) return;
+      clearTimeout(loadRetryTimer);
+      loadRetryTimer = null;
+    }
 
     function base() {
       let b = $("rpc").value.trim().replace(/\/$/, "");
@@ -234,7 +250,12 @@
     async function apiGet(path, params = {}) {
       const qs = new URLSearchParams(params).toString();
       const url = `${base()}/${path}${qs ? "?" + qs : ""}`;
-      const r = await fetch(url);
+      let r;
+      try {
+        r = await fetch(url);
+      } catch (e) {
+        throw new Error(`RPC unreachable at ${base()} — run START_WALLET.bat and keep HIP25-FULLNODE open`);
+      }
       const j = await r.json();
       if (j.ret !== 0) throw new Error(j.err || JSON.stringify(j));
       return j;
@@ -308,10 +329,10 @@
       $("btnUnstake").disabled = !wasmOk || !canUnstake;
     }
 
-    async function loadPortfolio() {
+    async function loadPortfolio(opts = {}) {
       const addr = $("address").value.trim();
       if (!addr) throw new Error("Address required");
-      log("Loading portfolio…");
+      if (!opts.retry) log("Loading portfolio…");
       const latest = await apiGet("query/latest");
       state.height = latest.height;
       $("sHeight").textContent = latest.height;
@@ -329,15 +350,39 @@
       $("sAccrued").textContent = summary.total_accrued_reward || "0";
 
       const names = splitDiamonds(entry.diamonds || "");
-      state.diamonds = [];
+      if (!names.length && state.height < 1) {
+        log("Waiting for block 1 (testnet seed loads with first block)…");
+        schedulePortfolioRetry();
+        return;
+      }
+      clearPortfolioRetry();
+      if (!names.length) {
+        state.diamonds = [];
+        state.selected.clear();
+        renderDiamonds();
+        log(`No HACD on ${addr} — use Fill testnet (1Do17Buq...)`, "err");
+        return;
+      }
       state.selected.clear();
+      state.diamonds = names.map((literal) => ({
+        literal,
+        status: "Loading",
+        accrued_reward: "0",
+        min_unstake_height: 0,
+      }));
+      renderDiamonds();
       await Promise.all(
-        names.map(async (literal) => {
+        names.map(async (literal, idx) => {
           try {
             const st = await apiGet("query/staking/status", { diamond: literal });
-            state.diamonds.push(st);
+            state.diamonds[idx] = {
+              literal: st.literal || literal,
+              status: st.status || "unknown",
+              accrued_reward: st.accrued_reward || "0",
+              min_unstake_height: st.min_unstake_height || 0,
+            };
           } catch (e) {
-            state.diamonds.push({ literal, status: "unknown", accrued_reward: "0", min_unstake_height: 0 });
+            state.diamonds[idx] = { literal, status: "unknown", accrued_reward: "0", min_unstake_height: 0 };
           }
         })
       );
@@ -400,12 +445,17 @@
     }
 
     $("rpc").value = window.location.origin || "http://127.0.0.1:8083";
+    $("address").value = TESTNET.address;
+    $("prikey").value = TESTNET.password;
 
     $("btnTestnet").onclick = () => {
       $("address").value = TESTNET.address;
       $("prikey").value = TESTNET.password;
       $("fee").value = TESTNET.fee;
+      $("chainId").value = "1";
+      $("rpc").value = window.location.origin || "http://127.0.0.1:8083";
       log("Filled HIP-25 testnet seed account (password: hip25test)");
+      loadPortfolio().catch((e) => log(e.message, "err"));
     };
 
     $("btnLoad").onclick = () => loadPortfolio().catch((e) => log(e.message, "err"));
@@ -421,7 +471,9 @@
     };
     $("btnSelNone").onclick = () => { state.selected.clear(); renderDiamonds(); };
 
-    initWasmSdk();
+    initWasmSdk().then(() => {
+      setTimeout(() => loadPortfolio().catch((e) => log(e.message, "err")), 1500);
+    });
   </script>
 </body>
 </html>
