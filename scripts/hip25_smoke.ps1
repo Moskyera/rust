@@ -1,4 +1,6 @@
 # HIP-25 testnet smoke test — run while fullnode listens on 8083
+# Note: hacash loads hacash.config.ini from target\debug\ (exe dir). Sync before run:
+#   Copy-Item ..\hacash.config.ini .\hacash.config.ini
 $Base = "http://127.0.0.1:8083"
 $Rqid = "hip25smoke$(Get-Random)"
 

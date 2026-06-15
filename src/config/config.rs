@@ -53,11 +53,17 @@ pub fn load_config(mut cnfilestr: String) -> IniObj {
     let mut execdir = std::env::current_exe().unwrap().parent().unwrap().to_path_buf();
     let mut cnf_file = execdir.join(&cnfilestr);
 
-    // cmd args
+    // cmd args: optional explicit config path (not subcommands like "poworker")
     let args: Vec<String> = env::args().collect();
     if args.len() == 2 {
-        cnfilestr = args[1].clone();
-        cnf_file = PathBuf::from(&cnfilestr);
+        let arg1 = &args[1];
+        let is_config_path = arg1.ends_with(".ini")
+            || arg1.contains('/')
+            || arg1.contains('\\');
+        if is_config_path {
+            cnfilestr = arg1.clone();
+            cnf_file = PathBuf::from(&cnfilestr);
+        }
     }
 
     // check exists

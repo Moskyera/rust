@@ -4,7 +4,9 @@ pub fn routes(mut ctx: ApiCtx) -> Router {
 
     use ctx::*;
     
-    let lrt = Router::new().route("/", get(console))
+    let lrt = Router::new()
+    .route("/hip25/wallet", get(hip25_wallet_page))
+    .route("/", get(console))
     
     // query
     .route(&query("latest"), get(latest))

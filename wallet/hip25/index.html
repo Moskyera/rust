@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HIP-25 HACD Staking Wallet</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --border: #2d3a4f;
+      --text: #e8edf4;
+      --muted: #8b9cb3;
+      --accent: #3d8bfd;
+      --green: #3dd68c;
+      --amber: #f5a623;
+      --red: #f56565;
+      --purple: #a78bfa;
+    }
+    * { box-sizing: border-box; margin: 0; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+    header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 1rem;
+      background: var(--surface);
+    }
+    header h1 { font-size: 1.15rem; font-weight: 600; }
+    header .tag {
+      font-size: 0.7rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      background: #243044;
+      color: var(--accent);
+    }
+    main { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .panel h2 {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } }
+    label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.35rem; }
+    input, select {
+      width: 100%;
+      padding: 0.55rem 0.75rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 0.9rem;
+    }
+    input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+    button {
+      padding: 0.55rem 1.1rem;
+      border-radius: 6px;
+      border: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-stake { background: var(--green); color: #0f1419; }
+    .btn-unstake { background: var(--amber); color: #0f1419; }
+    .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.75rem;
+    }
+    .stat {
+      background: var(--bg);
+      border-radius: 8px;
+      padding: 0.85rem;
+      border: 1px solid var(--border);
+    }
+    .stat .val { font-size: 1.25rem; font-weight: 700; }
+    .stat .lbl { font-size: 0.75rem; color: var(--muted); }
+    .diamond-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .diamond-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto auto;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem;
+      background: var(--bg);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .diamond-row.selected { border-color: var(--accent); }
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+    .badge-Available { background: #1e3a2f; color: var(--green); }
+    .badge-Staked { background: #2e2640; color: var(--purple); }
+    .badge-Cooldown { background: #3d3020; color: var(--amber); }
+    .badge-unknown { background: #333; color: var(--muted); }
+    .literal { font-family: ui-monospace, monospace; font-weight: 600; letter-spacing: 0.05em; }
+    .meta { font-size: 0.75rem; color: var(--muted); }
+    #log {
+      font-family: ui-monospace, monospace;
+      font-size: 0.78rem;
+      max-height: 200px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      color: var(--muted);
+    }
+    .empty { color: var(--muted); font-size: 0.9rem; padding: 1rem 0; }
+    .err { color: var(--red); }
+    .ok { color: var(--green); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>HIP-25 HACD Staking</h1>
+    <span class="tag">Wallet MVP</span>
+  </header>
+  <main>
+    <section class="panel">
+      <h2>Connection</h2>
+      <div class="grid-2">
+        <div>
+          <label for="rpc">RPC base URL</label>
+          <input id="rpc" value="" placeholder="http://127.0.0.1:8083" />
+        </div>
+        <div>
+          <label for="fee">Tx fee</label>
+          <input id="fee" value="0:247" />
+        </div>
+        <div>
+          <label for="address">Address</label>
+          <input id="address" placeholder="1Do17Buq..." />
+        </div>
+        <div>
+          <label for="prikey">Private key (64 hex)</label>
+          <input id="prikey" type="password" placeholder="95f8f596..." autocomplete="off" />
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-primary" id="btnLoad">Load portfolio</button>
+        <button class="btn-ghost" id="btnRefresh">Refresh</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Summary</h2>
+      <div class="stats" id="stats">
+        <div class="stat"><div class="val" id="sHac">—</div><div class="lbl">HAC balance</div></div>
+        <div class="stat"><div class="val" id="sStaked">—</div><div class="lbl">Staked HACD</div></div>
+        <div class="stat"><div class="val" id="sCooldown">—</div><div class="lbl">In cooldown</div></div>
+        <div class="stat"><div class="val" id="sAccrued">—</div><div class="lbl">Accrued rewards</div></div>
+        <div class="stat"><div class="val" id="sHeight">—</div><div class="lbl">Chain height</div></div>
+        <div class="stat"><div class="val" id="sPool">—</div><div class="lbl">Pool (zhu)</div></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Your HACD</h2>
+      <div class="btn-row" style="margin-top:0;margin-bottom:1rem">
+        <button class="btn-stake" id="btnStake" disabled>Stake selected</button>
+        <button class="btn-unstake" id="btnUnstake" disabled>Unstake selected</button>
+        <button class="btn-ghost" id="btnSelAll">Select all</button>
+        <button class="btn-ghost" id="btnSelNone">Clear</button>
+      </div>
+      <div class="diamond-list" id="diamonds">
+        <div class="empty">Load your wallet to see HACD and staking badges.</div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Activity log</h2>
+      <div id="log"></div>
+    </section>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const state = { diamonds: [], height: 0, selected: new Set() };
+
+    function base() {
+      let b = $("rpc").value.trim().replace(/\/$/, "");
+      if (!b) b = window.location.origin;
+      return b;
+    }
+
+    function log(msg, cls = "") {
+      const el = $("log");
+      const line = document.createElement("div");
+      if (cls) line.className = cls;
+      line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      el.prepend(line);
+    }
+
+    async function apiGet(path, params = {}) {
+      const qs = new URLSearchParams(params).toString();
+      const url = `${base()}/${path}${qs ? "?" + qs : ""}`;
+      const r = await fetch(url);
+      const j = await r.json();
+      if (j.ret !== 0) throw new Error(j.err || JSON.stringify(j));
+      return j;
+    }
+
+    async function apiPost(path, body, params = {}) {
+      const qs = new URLSearchParams(params).toString();
+      const url = `${base()}/${path}${qs ? "?" + qs : ""}`;
+      const bytes = body instanceof Uint8Array ? body : new TextEncoder().encode(body);
+      const r = await fetch(url, { method: "POST", body: bytes });
+      const j = await r.json();
+      if (j.ret !== 0) throw new Error(j.err || JSON.stringify(j));
+      return j;
+    }
+
+    function hexToBytes(hex) {
+      const out = new Uint8Array(hex.length / 2);
+      for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.substr(i * 2, 2), 16);
+      return out;
+    }
+
+    function splitDiamonds(str) {
+      if (!str) return [];
+      const w = 6;
+      const s = str.replace(/\s/g, "");
+      const out = [];
+      for (let i = 0; i < s.length; i += w) out.push(s.slice(i, i + w));
+      return out.filter((x) => x.length === w);
+    }
+
+    function renderDiamonds() {
+      const box = $("diamonds");
+      box.innerHTML = "";
+      if (!state.diamonds.length) {
+        box.innerHTML = '<div class="empty">No HACD on this address.</div>';
+        return;
+      }
+      for (const d of state.diamonds) {
+        const row = document.createElement("div");
+        row.className = "diamond-row" + (state.selected.has(d.literal) ? " selected" : "");
+        const canStake = d.status === "Available";
+        const canUnstake = d.status === "Staked" && state.height >= d.min_unstake_height;
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = state.selected.has(d.literal);
+        cb.disabled = !canStake && !canUnstake;
+        cb.onchange = () => {
+          if (cb.checked) state.selected.add(d.literal);
+          else state.selected.delete(d.literal);
+          updateActionButtons();
+          row.classList.toggle("selected", cb.checked);
+        };
+        const info = document.createElement("div");
+        info.innerHTML = `<div class="literal">${d.literal}</div><div class="meta">reward ${d.accrued_reward || "0"} · min unstake h ${d.min_unstake_height || "—"}</div>`;
+        const badge = document.createElement("span");
+        badge.className = `badge badge-${d.status}`;
+        badge.textContent = d.status;
+        row.append(cb, info, badge, document.createElement("span"));
+        box.appendChild(row);
+      }
+      updateActionButtons();
+    }
+
+    function updateActionButtons() {
+      const sel = [...state.selected];
+      const byName = Object.fromEntries(state.diamonds.map((d) => [d.literal, d]));
+      const canStake = sel.some((n) => byName[n]?.status === "Available");
+      const canUnstake = sel.some((n) => byName[n]?.status === "Staked" && state.height >= (byName[n].min_unstake_height || 0));
+      $("btnStake").disabled = !canStake;
+      $("btnUnstake").disabled = !canUnstake;
+    }
+
+    async function loadPortfolio() {
+      const addr = $("address").value.trim();
+      if (!addr) throw new Error("Address required");
+      log("Loading portfolio…");
+      const latest = await apiGet("query/latest");
+      state.height = latest.height;
+      $("sHeight").textContent = latest.height;
+
+      const global = await apiGet("query/staking/global");
+      $("sPool").textContent = global.reward_pool_pending_zhu ?? "—";
+
+      const bal = await apiGet("query/balance", { address: addr, diamonds: "true" });
+      const entry = bal.list?.[0] || {};
+      $("sHac").textContent = entry.hacash || "0";
+
+      const summary = await apiGet("query/staking/summary", { address: addr });
+      $("sStaked").textContent = summary.staked_count ?? 0;
+      $("sCooldown").textContent = summary.cooldown_count ?? 0;
+      $("sAccrued").textContent = summary.total_accrued_reward || "0";
+
+      const names = splitDiamonds(entry.diamonds || "");
+      state.diamonds = [];
+      state.selected.clear();
+      await Promise.all(
+        names.map(async (literal) => {
+          try {
+            const st = await apiGet("query/staking/status", { diamond: literal });
+            state.diamonds.push(st);
+          } catch (e) {
+            state.diamonds.push({ literal, status: "unknown", accrued_reward: "0", min_unstake_height: 0 });
+          }
+        })
+      );
+      state.diamonds.sort((a, b) => a.literal.localeCompare(b.literal));
+      renderDiamonds();
+      log(`Loaded ${names.length} HACD`, "ok");
+    }
+
+    async function submitStakeAction(kind) {
+      const addr = $("address").value.trim();
+      const prikey = $("prikey").value.trim();
+      const fee = $("fee").value.trim();
+      const sel = [...state.selected];
+      if (!sel.length) throw new Error("Select at least one HACD");
+      const diamonds = sel.join(",");
+      const txJson = JSON.stringify({
+        main_address: addr,
+        timestamp: 1718496000,
+        fee,
+        actions: [{ kind, diamonds }],
+      });
+      log(`Building tx kind ${kind} for ${diamonds}…`);
+      const built = await apiPost("create/transaction", txJson, { action: "true", signature: "true" });
+      log(`Built ${built.hash}`);
+      const signed = await apiPost("util/transaction/sign", hexToBytes(built.body), {
+        prikey,
+        signature: "true",
+        action: "true",
+      });
+      log("Signed");
+      const submitted = await apiPost("submit/transaction", hexToBytes(signed.body));
+      log(`Submitted ${submitted.hash}`, "ok");
+      setTimeout(loadPortfolio, 3000);
+    }
+
+    $("rpc").value = window.location.origin || "http://127.0.0.1:8083";
+
+    $("btnLoad").onclick = () => loadPortfolio().catch((e) => log(e.message, "err"));
+    $("btnRefresh").onclick = () => loadPortfolio().catch((e) => log(e.message, "err"));
+    $("btnStake").onclick = () => submitStakeAction(34).catch((e) => log(e.message, "err"));
+    $("btnUnstake").onclick = () => submitStakeAction(35).catch((e) => log(e.message, "err"));
+    $("btnSelAll").onclick = () => {
+      state.diamonds.forEach((d) => {
+        if (d.status === "Available" || (d.status === "Staked" && state.height >= d.min_unstake_height))
+          state.selected.add(d.literal);
+      });
+      renderDiamonds();
+    };
+    $("btnSelNone").onclick = () => { state.selected.clear(); renderDiamonds(); };
+  </script>
+</body>
+</html>

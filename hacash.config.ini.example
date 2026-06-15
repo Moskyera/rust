@@ -5,6 +5,7 @@ data_dir = hacash_hip25_testnet_data
 [server]
 enable = true
 listen = 8083
+; HIP-25 wallet MVP UI (same origin as RPC): http://127.0.0.1:8083/hip25/wallet
 recent_blocks = false
 average_fee_purity = false
 
@@ -18,6 +19,9 @@ chain_id = 1
 ; HIP-25 soft-fork activation height (consensus parameter, written to chain at genesis init).
 ; Dev/testnet: 1 (active from first block). Mainnet: set announced height (30-day timelock).
 staking_activation_height = 1
+; Dev only: seed HACD WTYUIA + 10 HAC to password-derived account at genesis.
+hip25_testnet_seed = false
+hip25_testnet_seed_password = hip25test
 
 [miner]
 enable = false

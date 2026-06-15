@@ -463,6 +463,15 @@ mod staking_tests {
     }
 
     #[test]
+    fn hip25_testnet_seed_password_address() {
+        use crate::core::account::Account;
+        let acc = Account::create_by_password("hip25test").unwrap();
+        eprintln!("HIP25_TESTNET_ADDRESS={}", acc.readable());
+        let prikey = hex::encode(acc.secret_key().serialize());
+        eprintln!("HIP25_TESTNET_PRIKEY={}", prikey);
+    }
+
+    #[test]
     fn fee_redirect_splits_13_87() {
         let (pool, burn) = staking_redirect_fee_zhu(1000);
         assert_eq!(pool, 130);

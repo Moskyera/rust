@@ -31,6 +31,7 @@ async fn server_listen(mut ser: RPCServer) {
         ser.engine.clone(),
         ser.hcshnd.clone(),
     ));
+    println!("[RPC Server] HIP-25 wallet UI: http://{addr}/hip25/wallet");
     if let Err(e) = axum::serve(listener, app).await {
         println!("{e}");
     }

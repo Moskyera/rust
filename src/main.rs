@@ -30,11 +30,15 @@ use crate::run::*;
 
 
 fn main() {
-
-    // poworker(); // HAC PoW Miner Worker
-    // diaworker(); // Diamond Miner Worker
-    fullnode(); // Hacash Full Node
-
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() >= 2 {
+        match args[1].as_str() {
+            "poworker" => return poworker(),
+            "diaworker" => return diaworker(),
+            _ => (),
+        }
+    }
+    fullnode();
 }
 
 
