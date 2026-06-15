@@ -1,4 +1,4 @@
-use std::fmt::*;
+use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::collections::{ HashMap, HashSet };
 
 use crate::x16rs;

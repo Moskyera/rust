@@ -1,4 +1,4 @@
-#![no_main]
+#![cfg_attr(not(test), no_main)]
 // #![no_std]
 
 // #[panic_handler]

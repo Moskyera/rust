@@ -39,6 +39,19 @@ pub fn diamond_status_is_staking_locked(status: &Uint1) -> bool {
     *status == DIAMOND_STATUS_STAKED || *status == DIAMOND_STATUS_STAKING_COOLDOWN
 }
 
+pub fn staking_status_label(status: &Uint1) -> &'static str {
+    if *status == DIAMOND_STATUS_STAKED {
+        return "staked";
+    }
+    if *status == DIAMOND_STATUS_STAKING_COOLDOWN {
+        return "cooldown";
+    }
+    if *status == DIAMOND_STATUS_NORMAL {
+        return "available";
+    }
+    "unknown"
+}
+
 /**
  * Global staking pool and reward index.
  * Singleton key: &[2, 3] in MintState (see state/def.rs).

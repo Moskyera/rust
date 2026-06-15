@@ -28,6 +28,10 @@ pub fn routes(mut ctx: ApiCtx) -> Router {
     .route(&query("diamond/engrave"), get(diamond_engrave))
     .route(&query("diamond/inscription_protocol_cost"), get(diamond_inscription_protocol_cost))
 
+    .route(&query("staking/status"), get(staking_status))
+    .route(&query("staking/summary"), get(staking_summary))
+    .route(&query("staking/global"), get(staking_global))
+
     .route(&query("fee/average"), get(fee_average))
 
     .route(&query("miner/notice"), get(miner_notice))

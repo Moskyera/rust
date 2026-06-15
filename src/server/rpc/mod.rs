@@ -67,5 +67,7 @@ include!("fee.rs");
 include!("miner.rs");
 include!("diamond_miner.rs");
 
+include!("staking.rs");
+
 
 

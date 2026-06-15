@@ -1,4 +1,4 @@
-
+use std::fmt;
 
 pub const AMOUNT_MIN_SIZE: usize = 2;
 

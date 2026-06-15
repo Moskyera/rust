@@ -1,4 +1,3 @@
-use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::cmp::Ordering::{Less,Greater};
 use std::cmp::{Ordering, PartialOrd, Ord};

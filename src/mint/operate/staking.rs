@@ -3,7 +3,7 @@ fn staking_accrued_zhu(global_index: &Uint8, snapshot: &Uint8) -> u64 {
     global_index.uint().saturating_sub(snapshot.uint())
 }
 
-fn staking_accrued_amount(global_index: &Uint8, snapshot: &Uint8) -> Ret<Amount> {
+pub fn staking_accrued_amount(global_index: &Uint8, snapshot: &Uint8) -> Ret<Amount> {
     let zhu = staking_accrued_zhu(global_index, snapshot) as i64;
     if zhu <= 0 {
         return Ok(Amount::default());
