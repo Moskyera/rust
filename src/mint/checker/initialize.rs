@@ -1,6 +1,13 @@
 
 fn impl_initialize(this: &BlockMintChecker, db: &mut dyn State) -> RetErr {
-    
+
+    {
+        let mut mint_state = crate::mint::state::MintState::wrap(db);
+        let mut global = mint_state.staking_global();
+        global.activation_height = BlockHeight::from(this.cnf.staking_activation_height);
+        mint_state.set_staking_global(&global);
+    }
+
 	let addr1 = Address::from_readable("12vi7DEZjh6KrK5PVmmqSgvuJPCsZMmpfi").unwrap();
 	let addr2 = Address::from_readable("1LsQLqkd8FQDh3R7ZhxC5fndNf92WfhM19").unwrap();
 	let addr3 = Address::from_readable("1NUgKsTgM6vQ5nxFHGz1C4METaYTPgiihh").unwrap();

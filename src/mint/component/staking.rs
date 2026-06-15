@@ -41,13 +41,13 @@ pub fn diamond_status_is_staking_locked(status: &Uint1) -> bool {
 
 pub fn staking_status_label(status: &Uint1) -> &'static str {
     if *status == DIAMOND_STATUS_STAKED {
-        return "staked";
+        return "Staked";
     }
     if *status == DIAMOND_STATUS_STAKING_COOLDOWN {
-        return "cooldown";
+        return "Cooldown";
     }
     if *status == DIAMOND_STATUS_NORMAL {
-        return "available";
+        return "Available";
     }
     "unknown"
 }
@@ -63,11 +63,16 @@ StructFieldStruct!(GlobalStakingState,
     paused              : Uint1
     unlock_queue_head   : Uint5
     unlock_queue_tail   : Uint5
+    activation_height   : BlockHeight
 );
 
 impl GlobalStakingState {
     pub fn is_paused(&self) -> bool {
         self.paused.uint() != 0
+    }
+
+    pub fn is_active_at(&self, height: u64) -> bool {
+        height >= self.activation_height.uint()
     }
 }
 

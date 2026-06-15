@@ -11,6 +11,22 @@ pub fn staking_accrued_amount(global_index: &Uint8, snapshot: &Uint8) -> Ret<Amo
     Amount::from_zhu(zhu)
 }
 
+/// Live accrual while staked; fixed `pending_reward` during cooldown (HIP-25 v1).
+pub fn staking_display_accrued_reward(
+    global_index: &Uint8,
+    record: &StakingRecord,
+) -> Ret<Amount> {
+    if record.is_active_stake() {
+        staking_accrued_amount(global_index, &record.reward_index)
+    } else {
+        Ok(record.pending_reward.clone())
+    }
+}
+
+pub fn staking_is_active_at_height(state: &MintState, height: u64) -> bool {
+    state.staking_global().is_active_at(height)
+}
+
 /// Returns true if tx contains a HACD transfer action (kinds 5–8).
 pub fn tx_contains_diamond_transfer(tx: &dyn TransactionRead) -> bool {
     for act in tx.actions() {
@@ -26,6 +42,21 @@ pub fn staking_redirect_fee_zhu(fee_zhu: u64) -> (u64, u64) {
     let to_pool = fee_zhu * STAKING_FEE_SHARE_PERCENT / 100;
     let to_burn = fee_zhu - to_pool;
     (to_pool, to_burn)
+}
+
+/// HIP-25: 40% of total transfer fee → pool; remainder follows burn/miner split.
+pub fn staking_split_transfer_tx_fee(total: &Amount, burn_90: bool) -> Ret<(u64, Amount)> {
+    let total_zhu = total.to_zhu_unsafe() as u64;
+    let (to_pool, remainder_zhu) = staking_redirect_fee_zhu(total_zhu);
+    let mut miner = if remainder_zhu > 0 {
+        Amount::from_zhu(remainder_zhu as i64)?
+    } else {
+        Amount::default()
+    };
+    if burn_90 && miner.unit() > 1 {
+        miner.unit_sub(1);
+    }
+    Ok((to_pool, miner))
 }
 
 pub fn staking_deposit_fee(state: &mut MintState, fee_zhu: u64) {
@@ -136,6 +167,11 @@ pub fn staking_process_unlock_queue(base_state: &mut dyn State, height: u64) -> 
 }
 
 pub fn staking_on_block_close(base_state: &mut dyn State, height: u64) -> Ret<()> {
+    let mint_state = MintState::wrap(base_state);
+    if !staking_is_active_at_height(&mint_state, height) {
+        return Ok(());
+    }
+    drop(mint_state);
     {
         let mut mint_state = MintState::wrap(base_state);
         staking_distribute_rewards(&mut mint_state)?;
@@ -212,6 +248,9 @@ pub fn staking_apply_stake(
 ) -> Ret<()> {
     diamonds.check()?;
     let mut global = state.staking_global();
+    if !global.is_active_at(height) {
+        return errf!("HACD staking is not active at height {}", height);
+    }
     if global.is_paused() {
         return errf!("HACD staking is paused");
     }
@@ -492,6 +531,74 @@ mod staking_tests {
         }
         let err = list.check().unwrap_err();
         assert!(format!("{}", err).contains("200"));
+    }
+
+    #[test]
+    fn transfer_fee_redirect_uses_total_fee_not_fee_got() {
+        let total = Amount::from_zhu(1000).unwrap();
+        let (pool, miner) = staking_split_transfer_tx_fee(&total, false).unwrap();
+        assert_eq!(pool, 400);
+        assert_eq!(miner.to_zhu_unsafe() as u64, 600);
+    }
+
+    #[test]
+    fn transfer_fee_redirect_applies_burn_90_on_remainder() {
+        let total = Amount::from_zhu(1000).unwrap();
+        let (pool, miner) = staking_split_transfer_tx_fee(&total, true).unwrap();
+        assert_eq!(pool, 400);
+        assert_eq!(miner.to_zhu_unsafe() as u64, 60);
+    }
+
+    #[test]
+    fn cooldown_display_reward_uses_pending_not_live_index() {
+        let (_dir, mut state) = test_state();
+        let s1 = test_staker();
+        let s2 = test_other();
+        seed_diamond(&mut state, "WTYUIA", &s1);
+        seed_diamond(&mut state, "HXVMEK", &s2);
+        let list1 = one_diamond_list("WTYUIA");
+        let stake_h = 1000u64;
+        let mut mint = MintState::wrap(&mut state);
+        staking_apply_stake(&mut mint, &s1, &list1, stake_h).unwrap();
+        staking_apply_stake(&mut mint, &s2, &one_diamond_list("HXVMEK"), stake_h).unwrap();
+        staking_deposit_fee(&mut mint, 1000);
+        staking_distribute_rewards(&mut mint).unwrap();
+        let pending_at_unstake = staking_accrued_amount(
+            &mint.staking_global().global_reward_index,
+            &mint.staking_record(&lit(b"WTYUIA")).unwrap().reward_index,
+        )
+        .unwrap();
+        let unstake_h = stake_h + MIN_STAKE_BLOCKS;
+        staking_apply_unstake(&mut mint, &s1, &list1, unstake_h).unwrap();
+        staking_deposit_fee(&mut mint, 2000);
+        staking_distribute_rewards(&mut mint).unwrap();
+        let rec = mint.staking_record(&lit(b"WTYUIA")).unwrap();
+        let displayed = staking_display_accrued_reward(
+            &mint.staking_global().global_reward_index,
+            &rec,
+        )
+        .unwrap();
+        assert_eq!(displayed, pending_at_unstake);
+        let live = staking_accrued_amount(
+            &mint.staking_global().global_reward_index,
+            &rec.reward_index,
+        )
+        .unwrap();
+        assert!(live > displayed);
+    }
+
+    #[test]
+    fn stake_before_activation_height_rejected() {
+        let (_dir, mut state) = test_state();
+        let staker = test_staker();
+        seed_diamond(&mut state, "WTYUIA", &staker);
+        let list = one_diamond_list("WTYUIA");
+        let mut mint = MintState::wrap(&mut state);
+        let mut global = mint.staking_global();
+        global.activation_height = BlockHeight::from(5000);
+        mint.set_staking_global(&global);
+        let err = staking_apply_stake(&mut mint, &staker, &list, 1000).unwrap_err();
+        assert!(format!("{}", err).contains("not active"));
     }
 
     #[test]

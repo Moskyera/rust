@@ -1,6 +1,6 @@
 
 use crate::mint::component::*;
-use crate::mint::operate::staking_accrued_amount;
+use crate::mint::operate::staking_display_accrued_reward;
 
 defineQueryObject!{ QStakingStatus,
     diamond, String, s!(""),
@@ -31,7 +31,7 @@ async fn staking_status(State(ctx): State<ApiCtx>, q: Query<QStakingStatus>) -> 
         if stake_height > 0 {
             min_unstake_height = stake_height + MIN_STAKE_BLOCKS;
         }
-        if let Ok(amt) = staking_accrued_amount(&global.global_reward_index, &rec.reward_index) {
+        if let Ok(amt) = staking_display_accrued_reward(&global.global_reward_index, &rec) {
             accrued_reward = amt.to_unit_string(&unit);
         }
     }
@@ -81,7 +81,7 @@ async fn staking_summary(State(ctx): State<ApiCtx>, q: Query<QStakingSummary>) -
             cooldown_count += 1;
         }
         if let Some(rec) = mintstate.staking_record(&dian) {
-            if let Ok(amt) = staking_accrued_amount(&global.global_reward_index, &rec.reward_index) {
+            if let Ok(amt) = staking_display_accrued_reward(&global.global_reward_index, &rec) {
                 total_accrued = total_accrued.add(&amt).unwrap_or(total_accrued);
             }
         }
@@ -105,6 +105,7 @@ async fn staking_global(State(ctx): State<ApiCtx>, _q: Query<QStakingGlobal>) ->
         "total_staked_shares", global.total_staked_shares.uint(),
         "reward_pool_pending_zhu", global.reward_pool_zhu.uint(),
         "global_reward_index", global.global_reward_index.uint(),
+        "activation_height", global.activation_height.uint(),
         "paused", global.is_paused(),
     };
     api_data(data)

@@ -5,6 +5,8 @@ pub struct MintConf {
     pub difficulty_adjust_blocks: u64, // height
     pub each_block_target_time: u64, // secs
     pub _test_mul: u64,
+    /// HIP-25 soft-fork height; staking rules apply from this block onward.
+    pub staking_activation_height: u64,
 }
 
 
@@ -21,6 +23,7 @@ impl MintConf {
             difficulty_adjust_blocks: ini_must_u64(&sec, "difficulty_adjust_blocks", 288), // 1 day
             each_block_target_time: ini_must_u64(&sec, "each_block_target_time", 300), // 5 mins
             _test_mul: ini_must_u64(&sec, "_test_mul", 1), // test
+            staking_activation_height: ini_must_u64(&sec, "staking_activation_height", 1),
         };
 
         cnf

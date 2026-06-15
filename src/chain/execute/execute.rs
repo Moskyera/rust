@@ -55,6 +55,7 @@ fn exec_tx_actions_withvm(is_fast_sync: bool,
     chain_id: u64, pending_height: u64, pending_hash: Hash, 
     bst: &mut dyn State, sto: &dyn Store, tx: &dyn TransactionRead,
 ) -> RetErr {
-    errf!("cannot exec tx with vm")
+    // Native mint actions (e.g. HIP-25 stake/unstake 34/35) do not require the Go HVM runtime.
+    exec_tx_actions_normal(is_fast_sync, chain_id, pending_height, pending_hash, bst, sto, tx)
 }
 
