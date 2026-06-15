@@ -216,6 +216,14 @@ pub fn action_from_json(main_addr: &Address, jsonv: &serde_json::Value) -> Ret<B
         protocol_cost,    j_hac
     }
 
+    if_ret_act_ns!{ DiamondStake,
+        diamonds, j_dias
+    }
+
+    if_ret_act_ns!{ DiamondUnstake,
+        diamonds, j_dias
+    }
+
 
     /*********** Other ***********/
 
@@ -508,6 +516,38 @@ pub fn action_to_json_desc(tx: &dyn TransactionRead, act: &dyn Action,
             resjsonobj.insert("description", json!(format!(
                 "Clean inscript {} HACD ({}) cost {} HAC fee",
                 dia_num, action.diamonds.splitstr(), cost_str
+            )));
+        }
+
+    }else if kind == DiamondStake::kid() {
+
+        let action = DiamondStake::must(&act.serialize());
+        let dia_num = action.diamonds.count().uint();
+        let dia_names = action.diamonds.readable();
+        resjsonobj = jsondata!{
+            "diamond", dia_num,
+            "diamonds", dia_names,
+        };
+        if ret_desc {
+            resjsonobj.insert("description", json!(format!(
+                "Stake {} HACD ({})",
+                dia_num, action.diamonds.splitstr()
+            )));
+        }
+
+    }else if kind == DiamondUnstake::kid() {
+
+        let action = DiamondUnstake::must(&act.serialize());
+        let dia_num = action.diamonds.count().uint();
+        let dia_names = action.diamonds.readable();
+        resjsonobj = jsondata!{
+            "diamond", dia_num,
+            "diamonds", dia_names,
+        };
+        if ret_desc {
+            resjsonobj.insert("description", json!(format!(
+                "Unstake {} HACD ({})",
+                dia_num, action.diamonds.splitstr()
             )));
         }
 
