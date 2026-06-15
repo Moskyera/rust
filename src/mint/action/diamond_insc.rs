@@ -63,7 +63,7 @@ fn diamond_inscription(this: &DiamondInscription, ctx: &dyn ExecContext, sta: &m
 		return errf!("diamond inscription cost error need {} but got {}", ttcost.to_fin_string(), pcost.to_fin_string())
 	}
 
-    // change count + HIP-25 fee redirect (22% protocol fee → staking pool)
+    // change count + HIP-25 fee redirect (13% protocol fee → staking pool)
     let pay_zhu = pcost.to_zhu_unsafe() as u64;
     let (to_pool, to_burn_zhu) = staking_redirect_fee_zhu(pay_zhu);
     if to_pool > 0 && staking_is_active_at_height(&state, pdhei) {

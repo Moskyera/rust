@@ -44,7 +44,7 @@ pub fn staking_redirect_fee_zhu(fee_zhu: u64) -> (u64, u64) {
     (to_pool, to_burn)
 }
 
-/// HIP-25: 22% of total transfer fee → pool; remainder follows burn/miner split.
+/// HIP-25: 13% of total transfer fee → pool; remainder follows burn/miner split.
 pub fn staking_split_transfer_tx_fee(total: &Amount, burn_90: bool) -> Ret<(u64, Amount)> {
     let total_zhu = total.to_zhu_unsafe() as u64;
     let (to_pool, remainder_zhu) = staking_redirect_fee_zhu(total_zhu);
@@ -463,10 +463,10 @@ mod staking_tests {
     }
 
     #[test]
-    fn fee_redirect_splits_22_78() {
+    fn fee_redirect_splits_13_87() {
         let (pool, burn) = staking_redirect_fee_zhu(1000);
-        assert_eq!(pool, 220);
-        assert_eq!(burn, 780);
+        assert_eq!(pool, 130);
+        assert_eq!(burn, 870);
     }
 
     #[test]
@@ -601,16 +601,16 @@ mod staking_tests {
     fn transfer_fee_redirect_uses_total_fee_not_fee_got() {
         let total = Amount::from_zhu(1000).unwrap();
         let (pool, miner) = staking_split_transfer_tx_fee(&total, false).unwrap();
-        assert_eq!(pool, 220);
-        assert_eq!(miner.to_zhu_unsafe() as u64, 780);
+        assert_eq!(pool, 130);
+        assert_eq!(miner.to_zhu_unsafe() as u64, 870);
     }
 
     #[test]
     fn transfer_fee_redirect_applies_burn_90_on_remainder() {
         let total = Amount::from_zhu(1000).unwrap();
         let (pool, miner) = staking_split_transfer_tx_fee(&total, true).unwrap();
-        assert_eq!(pool, 220);
-        assert_eq!(miner.to_zhu_unsafe() as u64, 78);
+        assert_eq!(pool, 130);
+        assert_eq!(miner.to_zhu_unsafe() as u64, 87);
     }
 
     #[test]

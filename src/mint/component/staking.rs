@@ -6,8 +6,8 @@
  * See HIP-25 for the full protocol specification.
  */
 
-/// 22% of eligible inscription protocol fees and transfer fees → reward pool
-pub const STAKING_FEE_SHARE_PERCENT: u64 = 22;
+/// 13% of eligible inscription protocol fees and transfer fees → reward pool
+pub const STAKING_FEE_SHARE_PERCENT: u64 = 13;
 
 /// ~3 days cooldown after unstake (1000 blocks ≈ 3.5 days per HIP-15)
 pub const COOLDOWN_BLOCKS: u64 = 864;
