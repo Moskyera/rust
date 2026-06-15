@@ -70,11 +70,7 @@ fn staking_enqueue_unlock(state: &mut MintState, entry: &StakingUnlockEntry) -> 
     Ok(())
 }
 
-fn staking_finalize_unlock(
-    mint_state: &mut MintState,
-    base_state: &mut dyn State,
-    entry: &StakingUnlockEntry,
-) -> Ret<()> {
+fn staking_finalize_unlock(mint_state: &mut MintState, entry: &StakingUnlockEntry) -> Ret<()> {
     let dianame = &entry.diamond;
     let mut diaitem = must_have!(
         format!("diamond {}", dianame.readable()),
@@ -90,48 +86,61 @@ fn staking_finalize_unlock(
     mint_state.set_diamond(dianame, &diaitem);
     mint_state.del_staking_record(dianame);
 
-    if entry.reward.is_positive() {
-        let mut core_state = CoreState::wrap(base_state);
-        hac_add(&mut core_state, &entry.staker, &entry.reward)?;
-    }
     Ok(())
 }
 
-pub fn staking_process_unlock_queue(
-    mint_state: &mut MintState,
-    base_state: &mut dyn State,
-    height: u64,
-) -> Ret<()> {
-    let mut global = mint_state.staking_global();
-    let mut head = global.unlock_queue_head.uint();
-    let tail = global.unlock_queue_tail.uint();
+pub fn staking_process_unlock_queue(base_state: &mut dyn State, height: u64) -> Ret<()> {
+    let mut pending: Vec<(Uint5, StakingUnlockEntry)> = Vec::new();
 
-    while head < tail {
-        let key = Uint5::from(head);
-        let entry = match mint_state.staking_unlock_entry(&key) {
-            Some(e) => e,
-            None => {
-                head += 1;
-                continue;
+    {
+        let mut mint_state = MintState::wrap(base_state);
+        let mut global = mint_state.staking_global();
+        let mut head = global.unlock_queue_head.uint();
+        let tail = global.unlock_queue_tail.uint();
+
+        while head < tail {
+            let key = Uint5::from(head);
+            let entry = match mint_state.staking_unlock_entry(&key) {
+                Some(e) => e,
+                None => {
+                    head += 1;
+                    continue;
+                }
+            };
+            if entry.unlock_height.uint() > height {
+                break;
             }
-        };
-        if entry.unlock_height.uint() > height {
-            break;
+            pending.push((key, entry));
+            head += 1;
         }
-        staking_finalize_unlock(mint_state, base_state, &entry)?;
-        mint_state.del_staking_unlock_entry(&key);
-        head += 1;
+
+        global.unlock_queue_head = Uint5::from(head);
+        mint_state.set_staking_global(&global);
     }
 
-    global.unlock_queue_head = Uint5::from(head);
-    mint_state.set_staking_global(&global);
+    for (key, entry) in pending {
+        let reward = entry.reward.clone();
+        let staker = entry.staker.clone();
+        {
+            let mut mint_state = MintState::wrap(base_state);
+            staking_finalize_unlock(&mut mint_state, &entry)?;
+            mint_state.del_staking_unlock_entry(&key);
+        }
+        if reward.is_positive() {
+            let mut core_state = CoreState::wrap(base_state);
+            hac_add(&mut core_state, &staker, &reward)?;
+        }
+    }
+
     Ok(())
 }
 
 pub fn staking_on_block_close(base_state: &mut dyn State, height: u64) -> Ret<()> {
-    let mut mint_state = MintState::wrap(base_state);
-    staking_distribute_rewards(&mut mint_state)?;
-    staking_process_unlock_queue(&mut mint_state, base_state, height)?;
+    {
+        let mut mint_state = MintState::wrap(base_state);
+        staking_distribute_rewards(&mut mint_state)?;
+    }
+    staking_process_unlock_queue(base_state, height)?;
     Ok(())
 }
 
