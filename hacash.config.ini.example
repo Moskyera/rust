@@ -24,6 +24,7 @@ staking_activation_height = 1
 hip25_testnet_seed = false
 hip25_testnet_seed_password = hip25test
 ; Unstake demo only: min_stake=5, cooldown=3 blocks (NEVER enable on mainnet)
+; Requires chain_id = 1 (HIP25_DEV_CHAIN_ID) — node refuses to start otherwise.
 hip25_testnet_demo_periods = false
 
 [miner]

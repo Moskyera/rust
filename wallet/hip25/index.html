@@ -157,19 +157,12 @@
           <input id="address" placeholder="1Do17Buq..." />
         </div>
         <div>
-          <label for="prikey">Private key (64 hex) or password</label>
-          <input id="prikey" type="password" placeholder="hip25test or 95f8f596..." autocomplete="off" />
+          <label for="prikey">Password (local WASM sign only — never sent to RPC)</label>
+          <input id="prikey" type="password" placeholder="hip25test" autocomplete="off" />
         </div>
         <div>
-          <label for="chainId">Chain ID (WASM SDK)</label>
+          <label for="chainId">Chain ID</label>
           <input id="chainId" value="1" />
-        </div>
-        <div>
-          <label>Tx builder</label>
-          <select id="txMode">
-            <option value="rpc">RPC (create/sign/submit)</option>
-            <option value="wasm">WASM SDK (hacd_stake / hacd_unstake)</option>
-          </select>
         </div>
       </div>
       <div class="btn-row">
@@ -213,11 +206,13 @@
   <script>
     const TESTNET = {
       address: "1Do17BuqMj5N4EZRuquXtoCCHFZpQoHyc2",
-      prikey: "hip25test",
-      prikeyHex: "95f8f5960f8d12471419d76716677cbe1764b628cf11213845b6d917a9f98657",
+      password: "hip25test",
       fee: "0:247",
-      diamonds: ["WTYUIA", "HXVMEK", "VMEKBS", "UIASHX", "MEKUIA"],
     };
+
+    function txTimestamp() {
+      return BigInt(Math.floor(Date.now() / 1000));
+    }
 
     const $ = (id) => document.getElementById(id);
     const state = { diamonds: [], height: 0, selected: new Set(), wasm: null };
@@ -308,8 +303,9 @@
       const byName = Object.fromEntries(state.diamonds.map((d) => [d.literal, d]));
       const canStake = sel.some((n) => byName[n]?.status === "Available");
       const canUnstake = sel.some((n) => byName[n]?.status === "Staked" && state.height >= (byName[n].min_unstake_height || 0));
-      $("btnStake").disabled = !canStake;
-      $("btnUnstake").disabled = !canUnstake;
+      const wasmOk = !!state.wasm;
+      $("btnStake").disabled = !wasmOk || !canStake;
+      $("btnUnstake").disabled = !wasmOk || !canUnstake;
     }
 
     async function loadPortfolio() {
@@ -355,81 +351,59 @@
       return JSON.parse(`{${raw}}`);
     }
 
+    function loadSdkScript() {
+      return new Promise((resolve, reject) => {
+        if (typeof wasm_bindgen === "function") return resolve();
+        const s = document.createElement("script");
+        s.src = `${base()}/pkg/hacash_sdk.js`;
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error("failed to load /pkg/hacash_sdk.js"));
+        document.head.appendChild(s);
+      });
+    }
+
     async function initWasmSdk() {
       const el = $("sdkStatus");
-      if (typeof wasm_bindgen !== "function") {
-        el.textContent = "WASM SDK: not loaded (use RPC mode or add /pkg/hacash_sdk.js)";
-        return;
-      }
       try {
+        await loadSdkScript();
         const wasmUrl = `${base()}/pkg/hacash_sdk_bg.wasm`;
         await wasm_bindgen(wasmUrl);
         state.wasm = wasm_bindgen;
-        el.textContent = "WASM SDK: ready (hacd_stake / hacd_unstake)";
+        el.textContent = "WASM SDK: ready — password stays in browser (hacd_stake / hacd_unstake)";
         el.className = "meta ok";
+        updateActionButtons();
       } catch (e) {
         el.textContent = `WASM SDK: ${e.message}`;
         el.className = "meta err";
       }
     }
 
-    async function submitStakeActionRpc(kind) {
-      const addr = $("address").value.trim();
-      const prikey = $("prikey").value.trim();
-      const fee = $("fee").value.trim();
-      const sel = [...state.selected];
-      if (!sel.length) throw new Error("Select at least one HACD");
-      const diamonds = sel.join(",");
-      const txJson = JSON.stringify({
-        main_address: addr,
-        timestamp: 1718496000,
-        fee,
-        actions: [{ kind, diamonds }],
-      });
-      log(`[RPC] Building tx kind ${kind} for ${diamonds}…`);
-      const built = await apiPost("create/transaction", txJson, { action: "true", signature: "true" });
-      log(`Built ${built.hash}`);
-      const signKey = prikey.length === 64 ? prikey : TESTNET.prikeyHex;
-      const signed = await apiPost("util/transaction/sign", hexToBytes(built.body), {
-        prikey: signKey,
-        signature: "true",
-        action: "true",
-      });
-      log("Signed");
-      const submitted = await apiPost("submit/transaction", hexToBytes(signed.body));
-      log(`Submitted ${submitted.hash}`, "ok");
-      setTimeout(loadPortfolio, 3000);
-    }
-
-    async function submitStakeActionWasm(stake) {
-      if (!state.wasm) throw new Error("WASM SDK not loaded");
+    async function submitStakeAction(kind) {
+      if (!state.wasm) throw new Error("WASM SDK required — build with scripts/build_wallet_sdk.ps1");
       const pass = $("prikey").value.trim();
+      if (!pass) throw new Error("Password required for local signing");
       const fee = $("fee").value.trim();
       const chainId = BigInt($("chainId").value.trim() || "1");
       const sel = [...state.selected];
       if (!sel.length) throw new Error("Select at least one HACD");
       const diamonds = sel.join(",");
+      const stake = kind === 34;
       const fn = stake ? state.wasm.hacd_stake : state.wasm.hacd_unstake;
-      log(`[WASM] ${stake ? "hacd_stake" : "hacd_unstake"} for ${diamonds}…`);
-      const raw = fn(chainId, pass, diamonds, fee, BigInt(1718496000));
+      const ts = txTimestamp();
+      log(`[WASM] ${stake ? "hacd_stake" : "hacd_unstake"} for ${diamonds} (ts=${ts})…`);
+      const raw = fn(chainId, pass, diamonds, fee, ts);
       const tx = parseSdkJson(raw);
-      log(`Built ${tx.tx_hash}`);
+      log(`Signed locally ${tx.tx_hash}`);
       const submitted = await apiPost("submit/transaction", hexToBytes(tx.tx_body));
       log(`Submitted ${submitted.hash}`, "ok");
       setTimeout(loadPortfolio, 3000);
-    }
-
-    async function submitStakeAction(kind) {
-      const useWasm = $("txMode").value === "wasm";
-      if (useWasm) return submitStakeActionWasm(kind === 34);
-      return submitStakeActionRpc(kind);
     }
 
     $("rpc").value = window.location.origin || "http://127.0.0.1:8083";
 
     $("btnTestnet").onclick = () => {
       $("address").value = TESTNET.address;
-      $("prikey").value = TESTNET.prikey;
+      $("prikey").value = TESTNET.password;
       $("fee").value = TESTNET.fee;
       log("Filled HIP-25 testnet seed account (password: hip25test)");
     };
@@ -449,6 +423,5 @@
 
     initWasmSdk();
   </script>
-  <script src="/pkg/hacash_sdk.js" async onerror="/* optional */"></script>
 </body>
 </html>

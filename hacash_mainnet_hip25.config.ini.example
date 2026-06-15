@@ -1,0 +1,30 @@
+; HIP-25 mainnet fullnode template — copy beside hacash binary as hacash.config.ini
+; Dev/testnet flags MUST stay false; node panics at startup if enabled with chain_id != 1.
+[default]
+data_dir = hacash_mainnet_data
+
+[server]
+enable = true
+listen = 8081
+recent_blocks = false
+average_fee_purity = false
+
+[node]
+listen = 3333
+not_find_nodes = false
+boots =
+
+[mint]
+; Hacash L1 mainnet sub-chain id (0). HIP25_DEV_CHAIN_ID = 1 is local testnet only.
+chain_id = 0
+; Announce activation height ≥30 days before fork (HIP-25 timelock). Replace 0 with agreed height.
+staking_activation_height = 0
+hip25_testnet_seed = false
+hip25_testnet_seed_password = hip25test
+hip25_testnet_demo_periods = false
+
+[miner]
+enable = false
+
+[diamondminer]
+enable = false

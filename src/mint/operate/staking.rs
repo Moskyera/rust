@@ -170,8 +170,12 @@ pub fn staking_process_unlock_queue(base_state: &mut dyn State, height: u64) -> 
             let entry = match mint_state.staking_unlock_entry(&key) {
                 Some(e) => e,
                 None => {
-                    head += 1;
-                    continue;
+                    return errf!(
+                        "staking unlock queue corrupted: missing entry {} (head {} tail {})",
+                        head,
+                        head,
+                        tail
+                    );
                 }
             };
             if entry.unlock_height.uint() > height {
@@ -725,5 +729,37 @@ mod staking_tests {
         .unwrap();
         let mint = MintStateDisk::wrap(&state);
         assert_eq!(mint.diamond(&dian).unwrap().status, DIAMOND_STATUS_STAKING_COOLDOWN);
+    }
+
+    #[test]
+    fn unlock_queue_missing_entry_fails_hard() {
+        let (_dir, mut state) = test_state();
+        let staker = test_staker();
+        seed_diamond(&mut state, "WTYUIA", &staker);
+        let list = one_diamond_list("WTYUIA");
+        let stake_h = 1000u64;
+        let mut mint = MintState::wrap(&mut state);
+        staking_apply_stake(&mut mint, &staker, &list, stake_h).unwrap();
+        staking_apply_unstake(&mut mint, &staker, &list, stake_h + MIN_STAKE_BLOCKS).unwrap();
+        mint.del_staking_unlock_entry(&Uint5::from(0));
+        let err = staking_process_unlock_queue(&mut state, stake_h + MIN_STAKE_BLOCKS + COOLDOWN_BLOCKS)
+            .unwrap_err();
+        assert!(format!("{}", err).contains("unlock queue corrupted"));
+    }
+
+    #[test]
+    fn hip25_dev_flags_rejected_on_mainnet_chain_id() {
+        use crate::config::{HIP25_DEV_CHAIN_ID, MintConf};
+        let mut cnf = MintConf {
+            chain_id: HIP25_DEV_CHAIN_ID + 99,
+            difficulty_adjust_blocks: 288,
+            each_block_target_time: 300,
+            _test_mul: 1,
+            staking_activation_height: 1,
+            hip25_testnet_seed: true,
+            hip25_testnet_seed_password: "hip25test".to_string(),
+            hip25_testnet_demo_periods: false,
+        };
+        assert!(cnf.validate_hip25_dev_flags().is_err());
     }
 }
