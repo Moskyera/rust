@@ -16,7 +16,44 @@ defineQueryObject!{ Q8375,
 }
 
 
-async fn transaction_sign(State(ctx): State<ApiCtx>, q: Query<Q8375>, body: Bytes) -> impl IntoResponse {
+fn parse_sign_request(q: &mut Q8375, body: &Bytes) -> Result<Vec<u8>, String> {
+    if !body.is_empty() {
+        if let Ok(v) = serde_json::from_slice::<serde_json::Value>(body) {
+            if let Some(pk) = v.get("prikey").and_then(|x| x.as_str()) {
+                if !pk.is_empty() {
+                    q.prikey = Some(pk.to_string());
+                }
+            }
+            if let Some(pk) = v.get("pubkey").and_then(|x| x.as_str()) {
+                if !pk.is_empty() {
+                    q.pubkey = Some(pk.to_string());
+                }
+            }
+            if let Some(sig) = v.get("sigdts").and_then(|x| x.as_str()) {
+                if !sig.is_empty() {
+                    q.sigdts = Some(sig.to_string());
+                }
+            }
+            if let Some(tx) = v.get("tx_body").and_then(|x| x.as_str()) {
+                let raw = hex::decode(tx).map_err(|_| "tx_body hex error".to_string())?;
+                return Ok(raw);
+            }
+        }
+    }
+    let hexbody = q.hexbody.unwrap_or(false);
+    let bddt = body.to_vec();
+    let raw = match hexbody {
+        false => bddt,
+        true => hex::decode(&bddt).map_err(|_| "hex format error".to_string())?,
+    };
+    Ok(raw)
+}
+
+async fn transaction_sign(State(ctx): State<ApiCtx>, Query(mut q): Query<Q8375>, body: Bytes) -> impl IntoResponse {
+    let chain_id = ctx.engine.config().chain_id;
+    if let Some(msg) = crate::server::security::reject_server_secret_signing(chain_id) {
+        return api_error(msg);
+    }
     ctx_store!(ctx, store);
     ctx_state!(ctx, state);
     q_unit!(q, unit);
@@ -26,14 +63,14 @@ async fn transaction_sign(State(ctx): State<ApiCtx>, q: Query<Q8375>, body: Byte
     q_must!(q, signature, false);
     q_must!(q, description, false);
 
-    let chain_id = ctx.engine.config().chain_id;
-    if let Some(msg) = crate::server::security::reject_server_secret_signing(chain_id) {
-        return api_error(msg);
-    }
-
     let lasthei = ctx.engine.latest_block().objc().height().uint();
 
-    let txdts = q_body_data_may_hex!(q, body);
+    let txdts = match parse_sign_request(&mut q, &body) {
+        Ok(v) => v,
+        Err(e) => return api_error(&e),
+    };
+    q_must!(q, prikey, s!(""));
+    q_must!(q, pubkey, s!(""));
     let Ok((mut tx, _)) = transaction::create(&txdts) else {
         return api_error("transaction body error")
     };

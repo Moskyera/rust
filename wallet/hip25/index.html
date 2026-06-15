@@ -464,7 +464,7 @@
       $("fee").value = TESTNET.fee;
       $("chainId").value = "1";
       $("rpc").value = window.location.origin || "http://127.0.0.1:8083";
-      log("Filled HIP-25 testnet seed account (password: hip25test)");
+      log("Filled HIP-25 testnet seed account");
       loadPortfolio().catch((e) => log(e.message, "err"));
     };
 
@@ -486,9 +486,13 @@
       try {
         const latest = await apiGet("query/latest");
         if (latest.chain_id !== undefined) $("chainId").value = String(latest.chain_id);
-        if (latest.hip25_dev && !$("address").value.trim()) {
-          $("address").value = TESTNET.address;
-          setTimeout(() => loadPortfolio().catch((e) => log(e.message, "err")), 500);
+        if (latest.hip25_dev) {
+          if (!$("address").value.trim()) {
+            $("address").value = TESTNET.address;
+            setTimeout(() => loadPortfolio().catch((e) => log(e.message, "err")), 500);
+          }
+        } else {
+          $("btnTestnet").style.display = "none";
         }
       } catch (e) {
         log(e.message, "err");

@@ -11,11 +11,35 @@ defineQueryObject!{ Q9374,
     diamonds, Option<String>, None,
 }
 
-async fn create_coin_transfer(State(ctx): State<ApiCtx>, q: Query<Q9374>) -> impl IntoResponse {
+fn merge_coin_transfer_json(q: &mut Q9374, body: &[u8]) {
+    if body.is_empty() {
+        return;
+    }
+    let Ok(v) = serde_json::from_slice::<serde_json::Value>(body) else {
+        return;
+    };
+    if let Some(s) = v.get("main_prikey").and_then(|x| x.as_str()) {
+        if !s.is_empty() {
+            q.main_prikey = s.to_string();
+        }
+    }
+    if let Some(s) = v.get("from_prikey").and_then(|x| x.as_str()) {
+        if !s.is_empty() {
+            q.from_prikey = Some(s.to_string());
+        }
+    }
+}
+
+async fn create_coin_transfer(
+    State(ctx): State<ApiCtx>,
+    Query(mut q): Query<Q9374>,
+    body: Bytes,
+) -> impl IntoResponse {
     let chain_id = ctx.engine.config().chain_id;
     if let Some(msg) = crate::server::security::reject_server_secret_signing(chain_id) {
         return api_error(msg);
     }
+    merge_coin_transfer_json(&mut q, &body);
     ctx_state!(ctx, state);
     q_must!(q, from_prikey, s!(""));
     q_must!(q, timestamp, 0);

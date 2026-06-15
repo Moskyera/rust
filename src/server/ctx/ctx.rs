@@ -25,7 +25,7 @@ impl ApiCtx {
             blocks: Arc::default(),
             miner_worker_notice_count: Arc::default(),
             listen_host,
-            rate_limiter: Arc::new(crate::server::security::RateLimiter::new(30, 60)),
+            rate_limiter: Arc::new(crate::server::security::RateLimiter::new(60, 60)),
             blocks_max: 4,
         }
     }

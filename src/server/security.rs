@@ -20,8 +20,29 @@ pub const RPC_BODY_LIMIT_BYTES: usize = 256 * 1024;
 /// Max diamonds processed per staking/summary request.
 pub const STAKING_SUMMARY_MAX_DIAMONDS: usize = 200;
 
+/// Max blocks per block/datas request.
+pub const BLOCK_DATAS_MAX_LIMIT: u64 = 500;
+
+const SECRET_QUERY_MARKERS: &[&str] = &[
+    "prikey=",
+    "main_prikey=",
+    "from_prikey=",
+    "fee_prikey=",
+    "password=",
+];
+
+const RATE_LIMIT_MAX_KEYS: usize = 4096;
+
 pub fn is_mainnet(chain_id: u64) -> bool {
     chain_id != HIP25_DEV_CHAIN_ID
+}
+
+pub fn is_loopback_host(host: &str) -> bool {
+    matches!(host, "127.0.0.1" | "localhost" | "::1" | "[::1]")
+}
+
+pub fn is_public_bind_host(host: &str) -> bool {
+    host == "0.0.0.0" || host == "::" || host == "[::]"
 }
 
 pub fn server_signing_disabled_msg() -> &'static str {
@@ -44,6 +65,20 @@ pub fn reject_create_account_on_mainnet(chain_id: u64) -> Option<&'static str> {
     }
 }
 
+pub fn query_string_has_secret_keys(query: &str) -> bool {
+    if query.is_empty() {
+        return false;
+    }
+    let q = query.to_ascii_lowercase();
+    SECRET_QUERY_MARKERS.iter().any(|m| q.contains(m))
+}
+
+pub fn path_accepts_signing_secrets(path: &str) -> bool {
+    path == "/util/transaction/sign"
+        || path == "/create/coin/transfer"
+        || path == "/operate/fee/raise"
+}
+
 /// Sliding-window per-IP rate limiter for expensive RPC routes.
 pub struct RateLimiter {
     inner: Mutex<HashMap<String, (u32, Instant)>>,
@@ -60,9 +95,20 @@ impl RateLimiter {
         }
     }
 
+    fn prune_stale(map: &mut HashMap<String, (u32, Instant)>, now: Instant, window: Duration) {
+        if map.len() <= RATE_LIMIT_MAX_KEYS {
+            return;
+        }
+        map.retain(|_, (_, start)| now.duration_since(*start) <= window);
+        if map.len() > RATE_LIMIT_MAX_KEYS {
+            map.clear();
+        }
+    }
+
     pub fn allow(&self, key: &str) -> bool {
         let mut map = self.inner.lock().unwrap();
         let now = Instant::now();
+        Self::prune_stale(&mut map, now, self.window);
         let entry = map.entry(key.to_string()).or_insert((0, now));
         if now.duration_since(entry.1) > self.window {
             *entry = (0, now);
@@ -86,33 +132,43 @@ fn client_ip(request: &Request) -> String {
 fn is_mutating_path(path: &str) -> bool {
     path.starts_with("/submit/")
         || path.starts_with("/operate/")
-        || path == "/util/transaction/sign"
-        || path == "/create/coin/transfer"
-        || path == "/create/transaction"
+        || path.starts_with("/create/")
+        || path.starts_with("/util/")
 }
 
-fn origin_allowed(origin: &str, listen_host: &str) -> bool {
+fn is_rate_limited_post(path: &str, method: &Method) -> bool {
+    *method == Method::POST
+        && (path.starts_with("/submit/")
+            || path.starts_with("/operate/")
+            || path.starts_with("/create/")
+            || path.starts_with("/util/"))
+}
+
+pub fn origin_allowed(origin: &str, listen_host: &str, listen_port: u16) -> bool {
     let o = origin.trim();
+    if is_loopback_host(listen_host) {
+        if o.is_empty() {
+            return true;
+        }
+        return o.starts_with(&format!("http://127.0.0.1:{listen_port}"))
+            || o.starts_with(&format!("http://localhost:{listen_port}"))
+            || o.starts_with(&format!("https://127.0.0.1:{listen_port}"))
+            || o.starts_with(&format!("https://localhost:{listen_port}"));
+    }
     if o.is_empty() {
-        return true;
-    }
-    if o.starts_with("http://127.0.0.1:")
-        || o.starts_with("http://localhost:")
-        || o.starts_with("https://127.0.0.1:")
-        || o.starts_with("https://localhost:")
-    {
-        return true;
-    }
-    if listen_host == "127.0.0.1" || listen_host == "localhost" {
         return false;
     }
-    format!("http://{listen_host}").starts_with(o)
-        || format!("https://{listen_host}").starts_with(o)
+    let host = listen_host.trim();
+    o.starts_with(&format!("http://{host}:{listen_port}"))
+        || o.starts_with(&format!("https://{host}:{listen_port}"))
+        || o == format!("http://{host}")
+        || o == format!("https://{host}")
 }
 
 #[derive(Clone)]
 pub struct MiddlewareCtx {
     pub listen_host: String,
+    pub listen_port: u16,
     pub rate_limiter: Arc<RateLimiter>,
 }
 
@@ -123,34 +179,45 @@ pub async fn security_middleware(
 ) -> Response {
     let path = request.uri().path().to_string();
     let method = request.method().clone();
+    let query = request.uri().query().unwrap_or("").to_string();
+
+    if query_string_has_secret_keys(&query)
+        && (path_accepts_signing_secrets(&path) || path.starts_with("/util/"))
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            api_error(
+                "secrets must be sent in POST JSON body, never in URL query strings",
+            ),
+        )
+            .into_response();
+    }
 
     if is_mutating_path(&path) {
-        if let Some(origin) = request.headers().get(header::ORIGIN).and_then(|v| v.to_str().ok()) {
-            if !origin_allowed(origin, &mw.listen_host) {
-                return (
-                    StatusCode::FORBIDDEN,
-                    api_error("cross-origin mutation blocked; use the local wallet UI"),
-                )
-                    .into_response();
-            }
+        let origin_hdr = request
+            .headers()
+            .get(header::ORIGIN)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+        if !origin_allowed(origin_hdr, &mw.listen_host, mw.listen_port) {
+            return (
+                StatusCode::FORBIDDEN,
+                api_error("cross-origin mutation blocked; use the local wallet UI"),
+            )
+                .into_response();
         }
     }
 
-    let ip = client_ip(&request);
-    let rate_key = if path.starts_with("/submit/transaction") {
-        format!("submit:{ip}")
-    } else if path.starts_with("/util/transaction/") {
-        format!("util:{ip}")
-    } else {
-        String::new()
-    };
-
-    if !rate_key.is_empty() && !mw.rate_limiter.allow(&rate_key) {
-        return (
-            StatusCode::TOO_MANY_REQUESTS,
-            api_error("rate limit exceeded, retry later"),
-        )
-            .into_response();
+    if is_rate_limited_post(&path, &method) {
+        let ip = client_ip(&request);
+        let rate_key = format!("post:{ip}:{}", path);
+        if !mw.rate_limiter.allow(&rate_key) {
+            return (
+                StatusCode::TOO_MANY_REQUESTS,
+                api_error("rate limit exceeded, retry later"),
+            )
+                .into_response();
+        }
     }
 
     if method == Method::GET && path == "/create/coin/transfer" {
@@ -180,4 +247,14 @@ pub async fn security_middleware(
         );
     }
     response
+}
+
+pub fn resolve_listen_endpoint(host: &str, port: u16, allow_public_rpc: bool) -> Result<String, String> {
+    let h = host.trim();
+    if is_public_bind_host(h) && !allow_public_rpc {
+        return Err(format!(
+            "listen_host={h} requires allow_public_rpc=true in [server] (default is loopback-only)"
+        ));
+    }
+    Ok(h.to_string())
 }

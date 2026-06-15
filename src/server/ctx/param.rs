@@ -3,7 +3,9 @@
 #[macro_export]
 macro_rules! ctx_state{
     ($ctx:expr, $state:ident) => (
-        let _s1_db = $ctx.engine.state();
+        let Some(_s1_db) = $ctx.engine.try_state() else {
+            return api_state_unavailable();
+        };
         let $state = CoreStateDisk::wrap(_s1_db.as_ref());
     )
 }
@@ -19,7 +21,9 @@ macro_rules! ctx_store{
 #[macro_export]
 macro_rules! ctx_mintstate{
     ($ctx:expr, $mintstate:ident) => (
-        let _s3_db = $ctx.engine.state();
+        let Some(_s3_db) = $ctx.engine.try_state() else {
+            return api_state_unavailable();
+        };
         let $mintstate = MintStateDisk::wrap(_s3_db.as_ref());
     )
 }

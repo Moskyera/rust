@@ -36,11 +36,27 @@ defineQueryObject!{ Q5396,
     hash, Option<String>, None, // find by tx hash
 }
 
-async fn raise_fee(State(ctx): State<ApiCtx>, q: Query<Q5396>, body: Bytes) -> impl IntoResponse {
+fn merge_raise_fee_json(q: &mut Q5396, body: &[u8]) {
+    if body.is_empty() {
+        return;
+    }
+    let Ok(v) = serde_json::from_slice::<serde_json::Value>(body) else {
+        return;
+    };
+    if let Some(s) = v.get("fee_prikey").and_then(|x| x.as_str()) {
+        if !s.is_empty() {
+            q.fee_prikey = s.to_string();
+        }
+    }
+}
+
+async fn raise_fee(State(ctx): State<ApiCtx>, Query(mut q): Query<Q5396>, body: Bytes) -> impl IntoResponse {
     let chain_id = ctx.engine.config().chain_id;
     if let Some(msg) = crate::server::security::reject_server_secret_signing(chain_id) {
         return api_error(msg);
     }
+    let body_copy = body.to_vec();
+    merge_raise_fee_json(&mut q, &body_copy);
     // ctx_store!(ctx, store);
     q_must!(q, hash, s!(""));
     let fee = q_data_amt!(q, fee);

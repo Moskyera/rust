@@ -182,6 +182,9 @@ async fn block_datas(State(ctx): State<ApiCtx>, q: Query<Q8538>) -> impl IntoRes
     q_must!(q, base64body, false);
     q_must!(q, start_height, 0);
     q_must!(q, limit, u64::MAX);
+    if limit > crate::server::security::BLOCK_DATAS_MAX_LIMIT {
+        limit = crate::server::security::BLOCK_DATAS_MAX_LIMIT;
+    }
     q_must!(q, max_size, MB); // 1mb
     q_must!(q, confirm, false);
     if max_size > 10*MB {

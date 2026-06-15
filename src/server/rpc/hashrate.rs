@@ -5,7 +5,6 @@ use crate::mint::difficulty::*;
 
 fn query_hashrate(ctx: &ApiCtx) -> JsonObject {
     ctx_store!(ctx, store);
-    ctx_state!(ctx, state);
 
     let mtckr = ctx.engine.mint_checker();
     let mtcnf = mtckr.config();
@@ -61,6 +60,9 @@ defineQueryObject!{ Q5295,
 }
 
 async fn hashrate(State(ctx): State<ApiCtx>, q: Query<Q5295>) -> impl IntoResponse {
+    let Some(_s1_db) = ctx.engine.try_state() else {
+        return api_state_unavailable();
+    };
 
     let data = query_hashrate(&ctx);
 

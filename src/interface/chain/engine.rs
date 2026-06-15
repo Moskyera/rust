@@ -10,6 +10,7 @@ pub trait EngineRead: Send + Sync {
     fn config(&self) -> &EngineConf { panic_never_call_this!() }
 
     fn state(&self) -> Arc<dyn State> { panic_never_call_this!() }
+    fn try_state(&self) -> Option<Arc<dyn State>> { None }
     fn store(&self) -> Arc<dyn Store> { panic_never_call_this!() }
 
     // fn confirm_state(&self) -> (Arc<dyn State>, Arc<dyn BlockPkg>) { panic_never_call_this!() }

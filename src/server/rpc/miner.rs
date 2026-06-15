@@ -35,7 +35,7 @@ fn update_miner_pending_block(block: BlockV1, cbtx: TransactionCoinbase) {
 }
 
 
-fn get_miner_pending_block_stuff(is_detail: bool, is_transaction: bool, is_stuff: bool, is_base64: bool) -> (HeaderMap, String) {
+fn get_miner_pending_block_stuff(is_detail: bool, is_transaction: bool, is_stuff: bool, is_base64: bool) -> Response {
     let mut stuff = MINER_PENDING_BLOCK.lock().unwrap();
     if stuff.len() == 0 {
         panic!("get miner pending block stuff error: block not init!");

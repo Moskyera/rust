@@ -18,12 +18,20 @@ impl RPCServer {
 
 async fn server_listen(mut ser: RPCServer) {
     use axum::extract::DefaultBodyLimit;
-    use std::net::IpAddr;
     use axum::Extension;
-    use crate::server::security::{MiddlewareCtx, RPC_BODY_LIMIT_BYTES, security_middleware};
+    use std::net::IpAddr;
+    use crate::server::security::{
+        MiddlewareCtx, RPC_BODY_LIMIT_BYTES, resolve_listen_endpoint, security_middleware,
+    };
 
     let port = ser.cnf.listen;
-    let host = ser.cnf.listen_host.clone();
+    let host = match resolve_listen_endpoint(&ser.cnf.listen_host, port, ser.cnf.allow_public_rpc) {
+        Ok(h) => h,
+        Err(e) => {
+            println!("\n[Error] RPC Server config: {}\n", e);
+            return;
+        }
+    };
     let ip: IpAddr = host.parse().unwrap_or_else(|_| "127.0.0.1".parse().unwrap());
     let addr = SocketAddr::from((ip, port));
     let listener = TcpListener::bind(addr).await;
@@ -33,16 +41,20 @@ async fn server_listen(mut ser: RPCServer) {
     }
     let listener = listener.unwrap();
     println!("[RPC Server] Listening on http://{addr}");
+    if crate::server::security::is_public_bind_host(&host) {
+        println!("[RPC Server] WARNING: public bind enabled (allow_public_rpc=true)");
+    }
     //
+    let mw = MiddlewareCtx {
+        listen_host: host.clone(),
+        listen_port: port,
+        rate_limiter: Arc::new(crate::server::security::RateLimiter::new(60, 60)),
+    };
     let ctx = ApiCtx::new(
         ser.engine.clone(),
         ser.hcshnd.clone(),
-        host.clone(),
+        host,
     );
-    let mw = MiddlewareCtx {
-        listen_host: host,
-        rate_limiter: ctx.rate_limiter.clone(),
-    };
     let app = rpc::routes(ctx)
         .layer(DefaultBodyLimit::max(RPC_BODY_LIMIT_BYTES))
         .layer(Extension(mw))

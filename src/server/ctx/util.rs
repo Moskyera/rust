@@ -42,24 +42,32 @@ pub fn json_headers() -> HeaderMap {
     headers
 }
 
-pub fn api_error(errmsg: &str) -> (HeaderMap, String) {
-    (json_headers(), json!({"ret":1,"err":errmsg}).to_string())
+pub fn api_error(errmsg: &str) -> Response {
+    (json_headers(), json!({"ret":1,"err":errmsg}).to_string()).into_response()
 }
 
-pub fn api_ok() -> (HeaderMap, String){
-    (json_headers(), json!({"ret":0,"ok":true}).to_string())
+pub fn api_state_unavailable() -> Response {
+    (
+        axum::http::StatusCode::SERVICE_UNAVAILABLE,
+        (json_headers(), json!({"ret":1,"err":"state temporarily unavailable, retry shortly"}).to_string()),
+    )
+        .into_response()
 }
 
-pub fn api_data_list(jsdts: Vec<Value>) -> (HeaderMap, String){
+pub fn api_ok() -> Response {
+    (json_headers(), json!({"ret":0,"ok":true}).to_string()).into_response()
+}
+
+pub fn api_data_list(jsdts: Vec<Value>) -> Response {
     let list = jsdts.iter().map(|a|a.to_string()).collect::<Vec<String>>().join(",");
-    (json_headers(), format!(r#"{{"ret":0,"list":[{}]}}"#, list))
+    (json_headers(), format!(r#"{{"ret":0,"list":[{}]}}"#, list)).into_response()
 }
 
-pub fn api_data(jsdts: HashMap<&'static str, Value>) -> (HeaderMap, String){
+pub fn api_data(jsdts: HashMap<&'static str, Value>) -> Response {
     let resjson = jsdts.iter().map(|(k,v)|
         format!(r#""{}":{}"#, k, v.to_string())
     ).collect::<Vec<String>>().join(",");
-    (json_headers(), format!(r#"{{"ret":0,{}}}"#, resjson))
+    (json_headers(), format!(r#"{{"ret":0,{}}}"#, resjson)).into_response()
 }
 
 

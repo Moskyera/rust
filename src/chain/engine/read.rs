@@ -5,8 +5,12 @@ impl EngineRead for BlockEngine {
         &self.cnf
     }
 
+    fn try_state(&self) -> Option<Arc<dyn State>> {
+        self.get_latest_state().map(|s| s as Arc<dyn State>)
+    }
+
     fn state(&self) -> Arc<dyn State> {
-        self.get_latest_state()
+        self.try_state()
             .expect("chain state unavailable during rebuild; retry shortly")
     }
 
