@@ -12,6 +12,7 @@ include!("util.rs");
 pub mod ctx;
 mod extend;
 mod unstable;
+pub mod security;
 mod rpc;
 pub mod http;
 

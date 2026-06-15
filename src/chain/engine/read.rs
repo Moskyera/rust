@@ -6,7 +6,8 @@ impl EngineRead for BlockEngine {
     }
 
     fn state(&self) -> Arc<dyn State> {
-        self.klctx.lock().unwrap().state.upgrade().unwrap()
+        self.get_latest_state()
+            .expect("chain state unavailable during rebuild; retry shortly")
     }
 
     fn store(&self) -> Arc<dyn Store> {

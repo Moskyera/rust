@@ -79,6 +79,14 @@ impl DiamondNameListMax200 {
                 return errf!("diamond name {} is not valid", v.readable())
             }
         }
+        // reject duplicates
+        for (i, a) in self.lists.iter().enumerate() {
+            for b in self.lists.iter().skip(i + 1) {
+                if a.as_ref() == b.as_ref() {
+                    return errf!("duplicate diamond {} in list", a.readable())
+                }
+            }
+        }
         // success
         Ok(reallen as u8)
     }

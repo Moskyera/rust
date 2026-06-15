@@ -66,7 +66,11 @@ fn _do_rebuild(this: &mut BlockEngine) {
         // try insert
         let ier = this.insert_unsafe(resblk);
         if let Err(e) = ier {
-            panic!("[State Panic] rebuild block state error: {}", e);
+            eprintln!(
+                "[State Fatal] rebuild block state error at height {}: {}",
+                next_height, e
+            );
+            std::process::exit(1);
         }
         // next
         std::io::stdout().flush().unwrap();

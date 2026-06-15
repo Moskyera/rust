@@ -26,7 +26,14 @@ fn serve_pkg_file(name: &str, content_type: &'static str) -> Response {
     };
     let path = dir.join(name);
     match std::fs::read(&path) {
-        Ok(bytes) => ([(header::CONTENT_TYPE, content_type)], bytes).into_response(),
+        Ok(bytes) => (
+            [
+                (header::CONTENT_TYPE, content_type),
+                (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
+            ],
+            bytes,
+        )
+            .into_response(),
         Err(_) => (StatusCode::NOT_FOUND, format!("missing {}", name)).into_response(),
     }
 }

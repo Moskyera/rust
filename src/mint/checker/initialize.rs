@@ -41,9 +41,8 @@ fn impl_initialize(this: &BlockMintChecker, db: &mut dyn State) -> RetErr {
         let mut core = CoreState::wrap(db);
         core.set_balance(&owner, &Balance::hacash(fee_hac));
         println!(
-            "[HIP-25 testnet seed] 5 HACD (WTYUIA,HXVMEK,VMEKBS,UIASHX,MEKUIA) + 11 HAC -> {} (password: {})",
-            owner.readable(),
-            &this.cnf.hip25_testnet_seed_password
+            "[HIP-25 testnet seed] 5 HACD (WTYUIA,HXVMEK,VMEKBS,UIASHX,MEKUIA) + 11 HAC -> {} (see docs for dev password)",
+            owner.readable()
         );
     }
 

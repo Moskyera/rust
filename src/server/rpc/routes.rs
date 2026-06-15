@@ -46,7 +46,7 @@ pub fn routes(mut ctx: ApiCtx) -> Router {
     // create
     .route(&create("account"), get(account))
     .route(&create("transaction"), post(transaction_build))
-    .route(&create("coin/transfer"), get(create_coin_transfer))
+    .route(&create("coin/transfer"), post(create_coin_transfer))
     
     // submit
     .route(&submit("transaction"), post(submit_transaction))
@@ -64,11 +64,13 @@ pub fn routes(mut ctx: ApiCtx) -> Router {
 
     ;
 
-    // merge unstable & extend
-    Router::new().merge(lrt)
-    .merge(unstable::routes())
-    .merge(extend::routes())
-    .with_state(ctx)
+    // merge extend (unstable test routes disabled in release builds)
+    let mut router = Router::new().merge(lrt).merge(extend::routes());
+    #[cfg(debug_assertions)]
+    {
+        router = router.merge(unstable::routes());
+    }
+    router.with_state(ctx)
     
 }
 

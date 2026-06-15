@@ -100,14 +100,24 @@ impl GlobalStakingState {
         height >= self.activation_height.uint()
     }
 
-    pub fn effective_min_stake_blocks(&self) -> u64 {
-        let v = self.demo_min_stake_blocks.uint();
-        if v > 0 { v } else { MIN_STAKE_BLOCKS }
+    pub fn effective_min_stake_blocks(&self, chain_id: u64) -> u64 {
+        if chain_id == crate::config::HIP25_DEV_CHAIN_ID {
+            let v = self.demo_min_stake_blocks.uint();
+            if v > 0 {
+                return v;
+            }
+        }
+        MIN_STAKE_BLOCKS
     }
 
-    pub fn effective_cooldown_blocks(&self) -> u64 {
-        let v = self.demo_cooldown_blocks.uint();
-        if v > 0 { v } else { COOLDOWN_BLOCKS }
+    pub fn effective_cooldown_blocks(&self, chain_id: u64) -> u64 {
+        if chain_id == crate::config::HIP25_DEV_CHAIN_ID {
+            let v = self.demo_cooldown_blocks.uint();
+            if v > 0 {
+                return v;
+            }
+        }
+        COOLDOWN_BLOCKS
     }
 }
 

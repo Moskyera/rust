@@ -29,7 +29,8 @@ async fn staking_status(State(ctx): State<ApiCtx>, q: Query<QStakingStatus>) -> 
         stake_height = rec.stake_height.uint();
         unlock_height = rec.unlock_height.uint();
         if stake_height > 0 {
-            min_unstake_height = stake_height + global.effective_min_stake_blocks();
+            let chain_id = ctx.engine.config().chain_id;
+            min_unstake_height = stake_height + global.effective_min_stake_blocks(chain_id);
         }
         if let Ok(amt) = staking_display_accrued_reward(&global.global_reward_index, &rec) {
             accrued_reward = amt.to_unit_string(&unit);
@@ -49,6 +50,8 @@ async fn staking_status(State(ctx): State<ApiCtx>, q: Query<QStakingStatus>) -> 
 
 defineQueryObject!{ QStakingSummary,
     address, String, s!(""),
+    offset, String, s!("0"),
+    limit, String, s!("200"),
 }
 
 async fn staking_summary(State(ctx): State<ApiCtx>, q: Query<QStakingSummary>) -> impl IntoResponse {
@@ -62,15 +65,34 @@ async fn staking_summary(State(ctx): State<ApiCtx>, q: Query<QStakingSummary>) -
     let owned = mintstate.diamond_owned(&adr).unwrap_or_default();
     let names = owned.readable();
     let global = mintstate.staking_global();
+    let mut offset = q.offset.parse::<usize>().unwrap_or(0);
+    let mut limit = q.limit.parse::<usize>().unwrap_or(200);
+    if limit == 0 {
+        limit = 200;
+    }
+    if limit > crate::server::security::STAKING_SUMMARY_MAX_DIAMONDS {
+        limit = crate::server::security::STAKING_SUMMARY_MAX_DIAMONDS;
+    }
+    let l = DiamondName::width();
+    let bytes = names.as_bytes();
+    let total_owned = bytes.len() / l;
     let mut staked_count = 0u64;
     let mut cooldown_count = 0u64;
     let mut total_accrued = Amount::default();
-    let l = DiamondName::width();
-    let bytes = names.as_bytes();
+    let mut processed = 0usize;
+    let mut skipped = 0usize;
     for i in (0..bytes.len()).step_by(l) {
         if i + l > bytes.len() {
             break;
         }
+        if skipped < offset {
+            skipped += 1;
+            continue;
+        }
+        if processed >= limit {
+            break;
+        }
+        processed += 1;
         let dian = DiamondName::cons(bytes[i..i + l].try_into().unwrap());
         let Some(diaobj) = mintstate.diamond(&dian) else {
             continue;
@@ -86,10 +108,15 @@ async fn staking_summary(State(ctx): State<ApiCtx>, q: Query<QStakingSummary>) -
             }
         }
     }
+    let truncated = offset + processed < total_owned;
     let data = jsondata!{
         "staked_count", staked_count,
         "cooldown_count", cooldown_count,
         "total_accrued_reward", total_accrued.to_unit_string(&unit),
+        "total_owned", total_owned as u64,
+        "offset", offset as u64,
+        "limit", limit as u64,
+        "truncated", truncated,
     };
     api_data(data)
 }

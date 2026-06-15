@@ -54,6 +54,6 @@ fn diamond_unstake(
     let staker = ctx.main_address();
     let height = ctx.pending_height();
     let mut state = MintState::wrap(sta);
-    staking_apply_unstake(&mut state, staker, &this.diamonds, height)?;
+    staking_apply_unstake(&mut state, staker, &this.diamonds, height, ctx.chain_id())?;
     Ok(vec![])
 }

@@ -73,7 +73,7 @@ pub fn ini_must_address(sec: &HashMap<String, Option<String>>, key: &str) -> Add
 pub fn ini_must_account(sec: &HashMap<String, Option<String>>, key: &str) -> Account {
     let pass = ini_must(sec, key, "123456");
     let Ok(acc) = Account::create_by(&pass) else {
-        panic!("[Config Error] account password {} error.", &pass)
+        panic!("[Config Error] account key '{}' invalid password or prikey format.", key)
     };
     acc
 }

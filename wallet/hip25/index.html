@@ -336,6 +336,15 @@
       const latest = await apiGet("query/latest");
       state.height = latest.height;
       $("sHeight").textContent = latest.height;
+      if (latest.chain_id !== undefined) {
+        const nodeChain = String(latest.chain_id);
+        const cur = $("chainId").value.trim();
+        if (!cur || cur !== nodeChain) {
+          $("chainId").value = nodeChain;
+          if (cur && cur !== nodeChain) log(`Chain ID synced to node (${nodeChain})`, "err");
+        }
+        $("chainId").readOnly = !latest.hip25_dev;
+      }
 
       const global = await apiGet("query/staking/global");
       $("sPool").textContent = global.reward_pool_pending_zhu ?? "—";
@@ -448,8 +457,6 @@
     }
 
     $("rpc").value = window.location.origin || "http://127.0.0.1:8083";
-    $("address").value = TESTNET.address;
-    $("prikey").value = TESTNET.password;
 
     $("btnTestnet").onclick = () => {
       $("address").value = TESTNET.address;
@@ -474,9 +481,20 @@
     };
     $("btnSelNone").onclick = () => { state.selected.clear(); renderDiamonds(); };
 
-    initWasmSdk().then(() => {
-      setTimeout(() => loadPortfolio().catch((e) => log(e.message, "err")), 1500);
-    });
+    async function bootstrap() {
+      await initWasmSdk();
+      try {
+        const latest = await apiGet("query/latest");
+        if (latest.chain_id !== undefined) $("chainId").value = String(latest.chain_id);
+        if (latest.hip25_dev && !$("address").value.trim()) {
+          $("address").value = TESTNET.address;
+          setTimeout(() => loadPortfolio().catch((e) => log(e.message, "err")), 500);
+        }
+      } catch (e) {
+        log(e.message, "err");
+      }
+    }
+    bootstrap();
   </script>
 </body>
 </html>

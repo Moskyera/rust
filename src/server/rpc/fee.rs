@@ -37,6 +37,10 @@ defineQueryObject!{ Q5396,
 }
 
 async fn raise_fee(State(ctx): State<ApiCtx>, q: Query<Q5396>, body: Bytes) -> impl IntoResponse {
+    let chain_id = ctx.engine.config().chain_id;
+    if let Some(msg) = crate::server::security::reject_server_secret_signing(chain_id) {
+        return api_error(msg);
+    }
     // ctx_store!(ctx, store);
     q_must!(q, hash, s!(""));
     let fee = q_data_amt!(q, fee);

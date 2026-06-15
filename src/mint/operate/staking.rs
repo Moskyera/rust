@@ -192,14 +192,14 @@ pub fn staking_process_unlock_queue(base_state: &mut dyn State, height: u64) -> 
     for (key, entry) in pending {
         let reward = entry.reward.clone();
         let staker = entry.staker.clone();
+        if reward.is_positive() {
+            let mut core_state = CoreState::wrap(base_state);
+            hac_add(&mut core_state, &staker, &reward)?;
+        }
         {
             let mut mint_state = MintState::wrap(base_state);
             staking_finalize_unlock(&mut mint_state, &entry)?;
             mint_state.del_staking_unlock_entry(&key);
-        }
-        if reward.is_positive() {
-            let mut core_state = CoreState::wrap(base_state);
-            hac_add(&mut core_state, &staker, &reward)?;
         }
     }
 
@@ -263,13 +263,16 @@ pub fn staking_exec_hvm_external(
     payload: &[u8],
     staker: &Address,
     height: u64,
+    chain_id: u64,
     base_state: &mut dyn State,
 ) -> Ret<()> {
     let diamonds = staking_parse_hvm_diamonds(payload)?;
     let mut mint_state = MintState::wrap(base_state);
     match opcode {
         STAKE_HACD_VMKIND => staking_apply_stake(&mut mint_state, staker, &diamonds, height),
-        UNSTAKE_HACD_VMKIND => staking_apply_unstake(&mut mint_state, staker, &diamonds, height),
+        UNSTAKE_HACD_VMKIND => {
+            staking_apply_unstake(&mut mint_state, staker, &diamonds, height, chain_id)
+        }
         _ => errf!("unknown HIP-25 HVM opcode {}", opcode),
     }
 }
@@ -336,6 +339,7 @@ pub fn staking_apply_unstake(
     staker: &Address,
     diamonds: &DiamondNameListMax200,
     height: u64,
+    chain_id: u64,
 ) -> Ret<()> {
     diamonds.check()?;
     let global = state.staking_global();
@@ -363,8 +367,8 @@ pub fn staking_apply_unstake(
         );
         let stake_height = record.stake_height.uint();
         let global_snap = state.staking_global();
-        let min_stake = global_snap.effective_min_stake_blocks();
-        let cooldown = global_snap.effective_cooldown_blocks();
+        let min_stake = global_snap.effective_min_stake_blocks(chain_id);
+        let cooldown = global_snap.effective_cooldown_blocks(chain_id);
         if height < stake_height + min_stake {
             return errf!(
                 "diamond {} must remain staked for at least {} blocks",
@@ -528,7 +532,7 @@ mod staking_tests {
         let stake_h = 1000u64;
         staking_apply_stake(&mut mint, &staker, &list, stake_h).unwrap();
         let too_early = stake_h + MIN_STAKE_BLOCKS - 1;
-        let err = staking_apply_unstake(&mut mint, &staker, &list, too_early).unwrap_err();
+        let err = staking_apply_unstake(&mut mint, &staker, &list, too_early, 0).unwrap_err();
         assert!(format!("{}", err).contains("at least"));
     }
 
@@ -544,7 +548,7 @@ mod staking_tests {
         staking_deposit_fee(&mut mint, 1000);
         staking_distribute_rewards(&mut mint, stake_h).unwrap();
         let unstake_h = stake_h + MIN_STAKE_BLOCKS;
-        staking_apply_unstake(&mut mint, &staker, &list, unstake_h).unwrap();
+        staking_apply_unstake(&mut mint, &staker, &list, unstake_h, 0).unwrap();
         let unlock_h = unstake_h + COOLDOWN_BLOCKS;
         staking_on_block_close(&mut state, unlock_h).unwrap();
         let mint = MintStateDisk::wrap(&state);
@@ -575,6 +579,7 @@ mod staking_tests {
             &s1,
             &one_diamond_list("WTYUIA"),
             100 + MIN_STAKE_BLOCKS,
+            0,
         )
         .unwrap();
         let pending = r1.reward_index.uint();
@@ -595,7 +600,7 @@ mod staking_tests {
         let err =
             staking_apply_stake(&mut mint, &staker, &one_diamond_list("HXVMEK"), 2000).unwrap_err();
         assert!(format!("{}", err).contains("paused"));
-        staking_apply_unstake(&mut mint, &staker, &list, 1000 + MIN_STAKE_BLOCKS).unwrap();
+        staking_apply_unstake(&mut mint, &staker, &list, 1000 + MIN_STAKE_BLOCKS, 0).unwrap();
     }
 
     #[test]
@@ -649,7 +654,7 @@ mod staking_tests {
         )
         .unwrap();
         let unstake_h = stake_h + MIN_STAKE_BLOCKS;
-        staking_apply_unstake(&mut mint, &s1, &list1, unstake_h).unwrap();
+        staking_apply_unstake(&mut mint, &s1, &list1, unstake_h, 0).unwrap();
         staking_deposit_fee(&mut mint, 2000);
         staking_distribute_rewards(&mut mint, unstake_h).unwrap();
         let rec = mint.staking_record(&lit(b"WTYUIA")).unwrap();
@@ -704,7 +709,7 @@ mod staking_tests {
         seed_diamond(&mut state, "WTYUIA", &staker);
         let mut wire = vec![STAKE_HACD_VMKIND];
         wire.extend(one_diamond_list("WTYUIA").serialize());
-        exec_staking_script(&wire, &staker, 5000, &mut state).unwrap();
+        exec_staking_script(&wire, &staker, 5000, 0, &mut state).unwrap();
         let mint = MintStateDisk::wrap(&state);
         assert_eq!(mint.diamond(&lit(b"WTYUIA")).unwrap().status, DIAMOND_STATUS_STAKED);
     }
@@ -715,7 +720,7 @@ mod staking_tests {
         let staker = test_staker();
         seed_diamond(&mut state, "WTYUIA", &staker);
         let wire = one_diamond_list("WTYUIA").serialize();
-        staking_exec_hvm_external(STAKE_HACD_VMKIND, &wire, &staker, 5000, &mut state).unwrap();
+        staking_exec_hvm_external(STAKE_HACD_VMKIND, &wire, &staker, 5000, 0, &mut state).unwrap();
         let mint = MintStateDisk::wrap(&state);
         let dian = lit(b"WTYUIA");
         assert_eq!(mint.diamond(&dian).unwrap().status, DIAMOND_STATUS_STAKED);
@@ -724,6 +729,7 @@ mod staking_tests {
             &wire,
             &staker,
             5000 + MIN_STAKE_BLOCKS,
+            0,
             &mut state,
         )
         .unwrap();
@@ -740,11 +746,75 @@ mod staking_tests {
         let stake_h = 1000u64;
         let mut mint = MintState::wrap(&mut state);
         staking_apply_stake(&mut mint, &staker, &list, stake_h).unwrap();
-        staking_apply_unstake(&mut mint, &staker, &list, stake_h + MIN_STAKE_BLOCKS).unwrap();
+        staking_apply_unstake(&mut mint, &staker, &list, stake_h + MIN_STAKE_BLOCKS, 0).unwrap();
         mint.del_staking_unlock_entry(&Uint5::from(0));
         let err = staking_process_unlock_queue(&mut state, stake_h + MIN_STAKE_BLOCKS + COOLDOWN_BLOCKS)
             .unwrap_err();
         assert!(format!("{}", err).contains("unlock queue corrupted"));
+    }
+
+    #[test]
+    fn non_owner_stake_rejected() {
+        let (_dir, mut state) = test_state();
+        let owner = test_staker();
+        let other = test_other();
+        seed_diamond(&mut state, "WTYUIA", &owner);
+        let list = one_diamond_list("WTYUIA");
+        let mut mint = MintState::wrap(&mut state);
+        let err = staking_apply_stake(&mut mint, &other, &list, 1000).unwrap_err();
+        assert!(format!("{}", err).contains("not belong"));
+    }
+
+    #[test]
+    fn non_owner_unstake_rejected() {
+        let (_dir, mut state) = test_state();
+        let owner = test_staker();
+        let other = test_other();
+        seed_diamond(&mut state, "WTYUIA", &owner);
+        let list = one_diamond_list("WTYUIA");
+        let mut mint = MintState::wrap(&mut state);
+        staking_apply_stake(&mut mint, &owner, &list, 1000).unwrap();
+        let err =
+            staking_apply_unstake(&mut mint, &other, &list, 1000 + MIN_STAKE_BLOCKS, 0).unwrap_err();
+        assert!(format!("{}", err).contains("not belong"));
+    }
+
+    #[test]
+    fn stake_during_cooldown_rejected() {
+        let (_dir, mut state) = test_state();
+        let staker = test_staker();
+        seed_diamond(&mut state, "WTYUIA", &staker);
+        let list = one_diamond_list("WTYUIA");
+        let mut mint = MintState::wrap(&mut state);
+        let stake_h = 1000u64;
+        staking_apply_stake(&mut mint, &staker, &list, stake_h).unwrap();
+        staking_apply_unstake(&mut mint, &staker, &list, stake_h + MIN_STAKE_BLOCKS, 0).unwrap();
+        let err = staking_apply_stake(&mut mint, &staker, &list, stake_h + MIN_STAKE_BLOCKS + 1)
+            .unwrap_err();
+        assert!(format!("{}", err).contains("cannot be staked"));
+    }
+
+    #[test]
+    fn duplicate_diamond_in_batch_rejected() {
+        let mut list = DiamondNameListMax200::default();
+        list.push(lit(b"WTYUIA")).unwrap();
+        list.push(lit(b"WTYUIA")).unwrap();
+        let err = list.check().unwrap_err();
+        assert!(format!("{}", err).contains("duplicate"));
+    }
+
+    #[test]
+    fn demo_periods_ignored_on_mainnet_chain_id() {
+        let (_dir, mut state) = test_state();
+        let mut mint = MintState::wrap(&mut state);
+        let mut global = mint.staking_global();
+        global.demo_min_stake_blocks = Uint5::from(5);
+        global.demo_cooldown_blocks = Uint5::from(3);
+        mint.set_staking_global(&global);
+        let g = mint.staking_global();
+        assert_eq!(g.effective_min_stake_blocks(0), MIN_STAKE_BLOCKS);
+        assert_eq!(g.effective_cooldown_blocks(0), COOLDOWN_BLOCKS);
+        assert_eq!(g.effective_min_stake_blocks(crate::config::HIP25_DEV_CHAIN_ID), 5);
     }
 
     #[test]

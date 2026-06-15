@@ -6,6 +6,7 @@ data_dir = hacash_mainnet_data
 [server]
 enable = true
 listen = 8081
+listen_host = 127.0.0.1
 recent_blocks = false
 average_fee_purity = false
 

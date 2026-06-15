@@ -26,6 +26,7 @@ echo data_dir = hacash_hip25_demo
 echo [server]
 echo enable = true
 echo listen = 8083
+echo listen_host = 127.0.0.1
 echo recent_blocks = false
 echo average_fee_purity = false
 echo [node]

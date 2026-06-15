@@ -29,7 +29,7 @@ fn script_execute_staking(
     let staker = ctx.main_address();
     let height = ctx.pending_height();
     let codes = this.codes.as_ref();
-    vm::exec_staking_script(codes, staker, height, sta)?;
+    vm::exec_staking_script(codes, staker, height, ctx.chain_id(), sta)?;
     Ok(vec![])
 }
 

@@ -5,6 +5,10 @@ defineQueryObject!{ Q8936,
 }
 
 async fn account(State(ctx): State<ApiCtx>, q: Query<Q8936>) -> impl IntoResponse {
+    let chain_id = ctx.engine.config().chain_id;
+    if let Some(msg) = crate::server::security::reject_create_account_on_mainnet(chain_id) {
+        return api_error(msg);
+    }
     q_must!(q, quantity, 1);
     if quantity == 0 {
         return api_error("quantity error")

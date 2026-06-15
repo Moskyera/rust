@@ -12,6 +12,10 @@ defineQueryObject!{ Q9374,
 }
 
 async fn create_coin_transfer(State(ctx): State<ApiCtx>, q: Query<Q9374>) -> impl IntoResponse {
+    let chain_id = ctx.engine.config().chain_id;
+    if let Some(msg) = crate::server::security::reject_server_secret_signing(chain_id) {
+        return api_error(msg);
+    }
     ctx_state!(ctx, state);
     q_must!(q, from_prikey, s!(""));
     q_must!(q, timestamp, 0);

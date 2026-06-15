@@ -28,6 +28,7 @@ data_dir = $DataDir
 [server]
 enable = true
 listen = 8083
+listen_host = 127.0.0.1
 recent_blocks = false
 average_fee_purity = false
 [node]

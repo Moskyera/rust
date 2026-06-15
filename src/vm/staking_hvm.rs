@@ -11,13 +11,14 @@ pub fn exec_staking_script(
     codes: &[u8],
     staker: &Address,
     height: u64,
+    chain_id: u64,
     state: &mut dyn State,
 ) -> RetErr {
     if codes.is_empty() {
         return errf!("staking script empty");
     }
     let opcode = codes[0];
-    exec_staking_hvm_opcode(opcode, &codes[1..], staker, height, state)
+    exec_staking_hvm_opcode(opcode, &codes[1..], staker, height, chain_id, state)
 }
 
 /// Rust-side entry for HIP-25 HVM opcodes. Full HVM runtime (Go) calls the same Mint hooks.
@@ -26,11 +27,12 @@ pub fn exec_staking_hvm_opcode(
     payload: &[u8],
     staker: &Address,
     height: u64,
+    chain_id: u64,
     state: &mut dyn State,
 ) -> RetErr {
     if opcode != STAKE_HACD_VMKIND && opcode != UNSTAKE_HACD_VMKIND {
         return errf!("unsupported staking HVM opcode {}", opcode);
     }
-    staking_exec_hvm_external(opcode, payload, staker, height, state)?;
+    staking_exec_hvm_external(opcode, payload, staker, height, chain_id, state)?;
     Ok(())
 }

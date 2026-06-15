@@ -11,17 +11,21 @@ pub struct ApiCtx {
     pub hcshnd: ChainNode,
     pub blocks: BlockCaches,
     pub miner_worker_notice_count: Arc<Mutex<u64>>,
+    pub listen_host: String,
+    pub rate_limiter: Arc<crate::server::security::RateLimiter>,
     blocks_max: usize, // 4
 
 }
 
 impl ApiCtx {
-    pub fn new(eng: ChainEngine, nd: ChainNode) -> ApiCtx {
+    pub fn new(eng: ChainEngine, nd: ChainNode, listen_host: String) -> ApiCtx {
         ApiCtx{
             engine: eng,
             hcshnd: nd,
             blocks: Arc::default(),
             miner_worker_notice_count: Arc::default(),
+            listen_host,
+            rate_limiter: Arc::new(crate::server::security::RateLimiter::new(30, 60)),
             blocks_max: 4,
         }
     }

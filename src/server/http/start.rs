@@ -17,22 +17,39 @@ impl RPCServer {
 
 
 async fn server_listen(mut ser: RPCServer) {
+    use axum::extract::DefaultBodyLimit;
+    use std::net::IpAddr;
+    use axum::Extension;
+    use crate::server::security::{MiddlewareCtx, RPC_BODY_LIMIT_BYTES, security_middleware};
+
     let port = ser.cnf.listen;
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    let host = ser.cnf.listen_host.clone();
+    let ip: IpAddr = host.parse().unwrap_or_else(|_| "127.0.0.1".parse().unwrap());
+    let addr = SocketAddr::from((ip, port));
     let listener = TcpListener::bind(addr).await;
     if let Err(ref e) = listener {
-        println!("\n[Error] RPC Server bind port {} error: {}\n", port, e);
+        println!("\n[Error] RPC Server bind {}:{} error: {}\n", host, port, e);
         return
     }
     let listener = listener.unwrap();
     println!("[RPC Server] Listening on http://{addr}");
-    // 
-    let app = rpc::routes(ApiCtx::new(
+    //
+    let ctx = ApiCtx::new(
         ser.engine.clone(),
         ser.hcshnd.clone(),
-    ));
+        host.clone(),
+    );
+    let mw = MiddlewareCtx {
+        listen_host: host,
+        rate_limiter: ctx.rate_limiter.clone(),
+    };
+    let app = rpc::routes(ctx)
+        .layer(DefaultBodyLimit::max(RPC_BODY_LIMIT_BYTES))
+        .layer(Extension(mw))
+        .layer(axum::middleware::from_fn(security_middleware));
     println!("[RPC Server] HIP-25 wallet UI: http://{addr}/hip25/wallet");
-    if let Err(e) = axum::serve(listener, app).await {
+    let make_svc = app.into_make_service_with_connect_info::<SocketAddr>();
+    if let Err(e) = axum::serve(listener, make_svc).await {
         println!("{e}");
     }
 }

@@ -27,10 +27,8 @@ async fn transaction_sign(State(ctx): State<ApiCtx>, q: Query<Q8375>, body: Byte
     q_must!(q, description, false);
 
     let chain_id = ctx.engine.config().chain_id;
-    if prikey.len() == 64 && chain_id != crate::config::HIP25_DEV_CHAIN_ID {
-        return api_error(
-            "server-side prikey signing is disabled on mainnet; use client-side WASM signing",
-        );
+    if let Some(msg) = crate::server::security::reject_server_secret_signing(chain_id) {
+        return api_error(msg);
     }
 
     let lasthei = ctx.engine.latest_block().objc().height().uint();
