@@ -25,6 +25,11 @@ cp target/x86_64-apple-darwin/release/hacash ./hacash_macos
 
 
 fn main() {
+    // Browser WASM SDK (hacd_stake / hacd_unstake) does not need native x16rs C code.
+    let target = std::env::var("TARGET").unwrap_or_default();
+    if target == "wasm32-unknown-unknown" {
+        return;
+    }
     cc::Build::new()
         .file("src/x16rs/x16rs.c")
         .compile("x16rs");

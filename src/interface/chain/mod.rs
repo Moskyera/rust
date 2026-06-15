@@ -5,6 +5,7 @@ use crate::config::*;
 use crate::base::field::*;
 use crate::core::field::*;
 use crate::core::db::*;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::chain::roller::*;
 
 

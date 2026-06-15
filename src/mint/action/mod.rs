@@ -26,6 +26,7 @@ include!("diamond.rs");
 include!("diamond_mint.rs");
 include!("diamond_insc.rs");
 include!("diamond_staking.rs");
+#[cfg(not(target_arch = "wasm32"))]
 include!("channel.rs");
 include!("action.rs");
 

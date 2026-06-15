@@ -5,10 +5,10 @@ use chrono::{TimeZone, Utc};
 
 use wasm_bindgen::prelude::*;
 
-use crate::core::field_bnk;
-use crate::core::field_bnk::*;
-use crate::core::interface::field::*;
-use crate::core::interface::transaction::*;
+use crate::base::field::*;
+use crate::core::field::*;
+use crate::interface::field::*;
+use crate::interface::protocol::{Transaction, TransactionRead};
 use crate::protocol::action;
 use crate::protocol::action::*;
 use crate::protocol::transaction;

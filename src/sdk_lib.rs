@@ -2,6 +2,11 @@
 
 #![cfg(target_arch = "wasm32")]
 
+#[macro_use]
+extern crate ini;
+#[macro_use]
+extern crate lazy_static;
+
 pub mod x16rs;
 
 #[macro_use]
@@ -9,6 +14,7 @@ pub mod sys;
 #[macro_use]
 pub mod base;
 pub mod interface;
+pub mod config;
 #[macro_use]
 pub mod core;
 #[macro_use]

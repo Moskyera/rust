@@ -1,11 +1,18 @@
-use chrono::Utc;
+use std::sync::Once;
 
 use crate::core::account::Account;
-use crate::core::field::diamond::DiamondNameListMax200;
-use crate::mint::action::{DiamondFromToTransfer, DiamondSingleTransfer, DiamondStake, DiamondUnstake};
-use crate::protocol::action::{
-    HacFromToTransfer, HacToTransfer, SatoshiFromToTransfer, SatoshiToTransfer, SubChainID,
-};
+use crate::core::field::DiamondNameListMax200;
+use crate::interface::field::Field;
+use crate::mint::action::{DiamondStake, DiamondUnstake};
+
+static SDK_INIT: Once = Once::new();
+
+fn ensure_sdk_init() {
+    SDK_INIT.call_once(|| {
+        crate::mint::action::init_reg();
+    });
+}
+use crate::protocol::action::{HacToTransfer, SubChainID};
 use crate::protocol::transaction::TransactionType2;
 
 fn if_add_chain_id(chain_id: u64, tx: &mut TransactionType2) {
@@ -58,11 +65,13 @@ fn build_signed_stake_tx(
     timestamp: i64,
     stake: bool,
 ) -> String {
+    ensure_sdk_init();
     let time_set = get_time_set(timestamp);
     let dlist = or_return! { "Diamond Name parse", parse_diamond_list(diamond_name_list) };
     let fee = or_return! { "Fee parse", Amount::from_string_unsafe(&fee) };
     let acc = or_return! { "From Account", Account::create_by(&from_pass) };
-    let mut tx = TransactionType2::build(*acc.address(), fee.clone());
+    let addr = or_return! { "From Address", Address::from_readable(acc.readable()) };
+    let mut tx = TransactionType2::build(addr, fee.clone());
     tx.timestamp = Timestamp::from(time_set as u64);
     if_add_chain_id(chain_id, &mut tx);
     if stake {
@@ -81,7 +90,7 @@ fn build_signed_stake_tx(
 
 #[wasm_bindgen]
 pub fn trs_test(x: i32) -> usize {
-    let mut bt = field_bnk::Fixed4::default();
+    let mut bt = Fixed4::default();
     let data = vec![x as u8 + 1, x as u8 + 2, x as u8 + 3, x as u8 + 4];
     let mut res = bt.parse(&data, 0).unwrap();
     let vals = bt.serialize();
@@ -107,6 +116,7 @@ pub fn create_acc_random() -> usize {
 #[wasm_bindgen]
 pub fn set_api_return_json() {}
 
+#[cfg(not(target_arch = "wasm32"))]
 #[wasm_bindgen]
 pub fn general_transfer(
     chain_id: u64,
@@ -150,6 +160,7 @@ pub fn general_transfer(
     "[ERROR]".to_string()
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[wasm_bindgen]
 pub fn hac_transfer(
     chain_id: u64,
@@ -186,6 +197,7 @@ pub fn hac_transfer(
     format!("{{{}}}", ok)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[wasm_bindgen]
 pub fn sat_transfer(
     chain_id: u64,
@@ -236,6 +248,7 @@ pub fn sat_transfer(
     format!("{{{}}}", ok)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[wasm_bindgen]
 pub fn hacd_transfer(
     chain_id: u64,

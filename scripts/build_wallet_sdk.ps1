@@ -16,7 +16,8 @@ if (-not (Test-Path $WasmSrc)) { throw "WASM build failed: $WasmSrc" }
 New-Item -ItemType Directory -Force -Path $PkgDir | Out-Null
 New-Item -ItemType Directory -Force -Path $WalletPkg | Out-Null
 
-wasm-bindgen $WasmSrc --out-dir $PkgDir --target web --no-typescript
+# no-modules: exposes global wasm_bindgen for /hip25/wallet classic script tag
+wasm-bindgen $WasmSrc --out-dir $PkgDir --target no-modules --no-typescript
 
 Copy-Item (Join-Path $PkgDir "hacash_sdk.js") (Join-Path $WalletPkg "hacash_sdk.js") -Force
 Copy-Item (Join-Path $PkgDir "hacash_sdk_bg.wasm") (Join-Path $WalletPkg "hacash_sdk_bg.wasm") -Force

@@ -13,11 +13,13 @@ use crate::protocol::operate::*;
 
 use super::state::*;
 use super::component::*;
+#[cfg(not(target_arch = "wasm32"))]
 use super::coinbase::*;
 
 
 
 
+#[cfg(not(target_arch = "wasm32"))]
 include!("channel.rs");
 include!("diamond.rs");
 include!("staking.rs");

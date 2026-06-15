@@ -1,10 +1,5 @@
-use std::ptr;
-use std::ffi::{ c_void, c_char, CString };
-use leveldb_sys::*;
-use libc::size_t;
+#[cfg(target_arch = "wasm32")]
+include!("wasm_stub.rs");
 
-include!("error.rs");
-include!("bytes.rs");
-include!("batch.rs");
-include!("db.rs");
-
+#[cfg(not(target_arch = "wasm32"))]
+include!("native_level.rs");
