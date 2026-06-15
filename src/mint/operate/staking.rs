@@ -170,6 +170,40 @@ pub fn check_diamond_stakeable(
     Ok(diaitem)
 }
 
+/// Parse HVM / HIP-25 diamond list wire format: `Uint1 count` + `count × 6` literal bytes.
+pub fn staking_parse_hvm_diamonds(raw: &[u8]) -> Ret<DiamondNameListMax200> {
+    if raw.is_empty() {
+        return errf!("diamond list empty");
+    }
+    let mut list = DiamondNameListMax200::default();
+    list.parse(raw, 0)?;
+    list.check()?;
+    Ok(list)
+}
+
+/// Execute HIP-25 HVM external opcode (`0x01` stake, `0x02` unstake) against Mint state.
+pub fn staking_exec_hvm_external(
+    opcode: u8,
+    payload: &[u8],
+    staker: &Address,
+    height: u64,
+    base_state: &mut dyn State,
+) -> Ret<()> {
+    let diamonds = staking_parse_hvm_diamonds(payload)?;
+    let mut mint_state = MintState::wrap(base_state);
+    match opcode {
+        STAKE_HACD_VMKIND => staking_apply_stake(&mut mint_state, staker, &diamonds, height),
+        UNSTAKE_HACD_VMKIND => staking_apply_unstake(&mut mint_state, staker, &diamonds, height),
+        _ => errf!("unknown HIP-25 HVM opcode {}", opcode),
+    }
+}
+
+pub fn staking_set_paused(state: &mut MintState, paused: bool) {
+    let mut global = state.staking_global();
+    global.paused = Uint1::from(if paused { 1 } else { 0 });
+    state.set_staking_global(&global);
+}
+
 pub fn staking_apply_stake(
     state: &mut MintState,
     staker: &Address,
@@ -276,6 +310,54 @@ pub fn staking_apply_unstake(
 #[cfg(test)]
 mod staking_tests {
     use super::*;
+    use crate::core::state::ChainState;
+    use crate::mint::operate::hacd_move_one_diamond;
+    use tempfile::TempDir;
+
+    fn test_state() -> (TempDir, ChainState) {
+        let dir = TempDir::new().unwrap();
+        let state = ChainState::open(dir.path());
+        (dir, state)
+    }
+
+    fn test_staker() -> Address {
+        Address::from_readable("12vi7DEZjh6KrK5PVmmqSgvuJPCsZMmpfi").unwrap()
+    }
+
+    fn test_other() -> Address {
+        Address::from_readable("1LsQLqkd8FQDh3R7ZhxC5fndNf92WfhM19").unwrap()
+    }
+
+    fn seed_diamond(state: &mut ChainState, name: &str, owner: &Address) -> DiamondName {
+        let dian = DiamondName::cons(name.as_bytes().try_into().unwrap());
+        let dia = DiamondSto {
+            status: DIAMOND_STATUS_NORMAL,
+            address: owner.clone(),
+            prev_engraved_height: BlockHeight::from(0),
+            inscripts: Inscripts::default(),
+        };
+        let mut mint = MintState::wrap(state);
+        mint.set_diamond(&dian, &dia);
+        dian
+    }
+
+    fn one_diamond_list(name: &str) -> DiamondNameListMax200 {
+        let mut list = DiamondNameListMax200::default();
+        list.push(DiamondName::cons(name.as_bytes().try_into().unwrap()))
+            .unwrap();
+        list
+    }
+
+    fn hac_balance(state: &ChainState, addr: &Address) -> Amount {
+        let core = CoreStateDisk::wrap(state);
+        core.balance(addr)
+            .map(|b| b.hacash.clone())
+            .unwrap_or_default()
+    }
+
+    fn lit(name: &[u8; 6]) -> DiamondName {
+        DiamondName::cons(*name)
+    }
 
     #[test]
     fn fee_redirect_splits_40_60() {
@@ -288,5 +370,149 @@ mod staking_tests {
     fn min_stake_blocks_is_three_months_scale() {
         assert!(MIN_STAKE_BLOCKS > 20000);
         assert!(COOLDOWN_BLOCKS < 1000);
+    }
+
+    #[test]
+    fn stake_owned_hacd_sets_staked_status() {
+        let (_dir, mut state) = test_state();
+        let staker = test_staker();
+        let dian = seed_diamond(&mut state, "WTYUIA", &staker);
+        let list = one_diamond_list("WTYUIA");
+        let mut mint = MintState::wrap(&mut state);
+        staking_apply_stake(&mut mint, &staker, &list, 1000).unwrap();
+        let dia = mint.diamond(&dian).unwrap();
+        assert_eq!(dia.status, DIAMOND_STATUS_STAKED);
+        assert_eq!(mint.staking_global().total_staked_shares.uint(), 1);
+    }
+
+    #[test]
+    fn transfer_staked_hacd_rejected() {
+        let (_dir, mut state) = test_state();
+        let staker = test_staker();
+        let other = test_other();
+        seed_diamond(&mut state, "WTYUIA", &staker);
+        let list = one_diamond_list("WTYUIA");
+        let mut mint = MintState::wrap(&mut state);
+        staking_apply_stake(&mut mint, &staker, &list, 1000).unwrap();
+        let dian = lit(b"WTYUIA");
+        let err = hacd_move_one_diamond(&mut mint, &staker, &other, &dian).unwrap_err();
+        assert!(format!("{}", err).contains("staked"));
+    }
+
+    #[test]
+    fn unstake_before_min_stake_age_rejected() {
+        let (_dir, mut state) = test_state();
+        let staker = test_staker();
+        seed_diamond(&mut state, "WTYUIA", &staker);
+        let list = one_diamond_list("WTYUIA");
+        let mut mint = MintState::wrap(&mut state);
+        let stake_h = 1000u64;
+        staking_apply_stake(&mut mint, &staker, &list, stake_h).unwrap();
+        let too_early = stake_h + MIN_STAKE_BLOCKS - 1;
+        let err = staking_apply_unstake(&mut mint, &staker, &list, too_early).unwrap_err();
+        assert!(format!("{}", err).contains("at least"));
+    }
+
+    #[test]
+    fn unstake_cooldown_unlock_pays_reward() {
+        let (_dir, mut state) = test_state();
+        let staker = test_staker();
+        seed_diamond(&mut state, "WTYUIA", &staker);
+        let list = one_diamond_list("WTYUIA");
+        let stake_h = 1000u64;
+        let mut mint = MintState::wrap(&mut state);
+        staking_apply_stake(&mut mint, &staker, &list, stake_h).unwrap();
+        staking_deposit_fee(&mut mint, 1000);
+        staking_distribute_rewards(&mut mint).unwrap();
+        let unstake_h = stake_h + MIN_STAKE_BLOCKS;
+        staking_apply_unstake(&mut mint, &staker, &list, unstake_h).unwrap();
+        let unlock_h = unstake_h + COOLDOWN_BLOCKS;
+        staking_on_block_close(&mut state, unlock_h).unwrap();
+        let mint = MintStateDisk::wrap(&state);
+        let dian = lit(b"WTYUIA");
+        let dia = mint.diamond(&dian).unwrap();
+        assert_eq!(dia.status, DIAMOND_STATUS_NORMAL);
+        assert!(mint.staking_record(&dian).is_none());
+        assert!(hac_balance(&state, &staker).is_positive());
+    }
+
+    #[test]
+    fn two_stakers_split_rewards_proportionally() {
+        let (_dir, mut state) = test_state();
+        let s1 = test_staker();
+        let s2 = test_other();
+        seed_diamond(&mut state, "WTYUIA", &s1);
+        seed_diamond(&mut state, "HXVMEK", &s2);
+        let mut mint = MintState::wrap(&mut state);
+        staking_apply_stake(&mut mint, &s1, &one_diamond_list("WTYUIA"), 100).unwrap();
+        staking_apply_stake(&mut mint, &s2, &one_diamond_list("HXVMEK"), 100).unwrap();
+        staking_deposit_fee(&mut mint, 1000);
+        staking_distribute_rewards(&mut mint).unwrap();
+        let g = mint.staking_global();
+        assert_eq!(g.global_reward_index.uint(), 500);
+        let r1 = mint.staking_record(&lit(b"WTYUIA")).unwrap();
+        staking_apply_unstake(
+            &mut mint,
+            &s1,
+            &one_diamond_list("WTYUIA"),
+            100 + MIN_STAKE_BLOCKS,
+        )
+        .unwrap();
+        let pending = r1.reward_index.uint();
+        let accrued = g.global_reward_index.uint().saturating_sub(pending);
+        assert_eq!(accrued, 500);
+    }
+
+    #[test]
+    fn pause_rejects_stake_allows_unstake() {
+        let (_dir, mut state) = test_state();
+        let staker = test_staker();
+        seed_diamond(&mut state, "WTYUIA", &staker);
+        seed_diamond(&mut state, "HXVMEK", &staker);
+        let list = one_diamond_list("WTYUIA");
+        let mut mint = MintState::wrap(&mut state);
+        staking_apply_stake(&mut mint, &staker, &list, 1000).unwrap();
+        staking_set_paused(&mut mint, true);
+        let err =
+            staking_apply_stake(&mut mint, &staker, &one_diamond_list("HXVMEK"), 2000).unwrap_err();
+        assert!(format!("{}", err).contains("paused"));
+        staking_apply_unstake(&mut mint, &staker, &list, 1000 + MIN_STAKE_BLOCKS).unwrap();
+    }
+
+    #[test]
+    fn batch_over_200_rejected() {
+        let mut list = DiamondNameListMax200::default();
+        let chars = b"WTYUIAHXVMEKBSZN";
+        for i in 0..201usize {
+            let mut bytes = [b'W'; 6];
+            for j in 0..6 {
+                bytes[j] = chars[(i + j) % chars.len()];
+            }
+            list.push(DiamondName::cons(bytes)).unwrap();
+        }
+        let err = list.check().unwrap_err();
+        assert!(format!("{}", err).contains("200"));
+    }
+
+    #[test]
+    fn hvm_opcode_stake_and_unstake_via_bridge() {
+        let (_dir, mut state) = test_state();
+        let staker = test_staker();
+        seed_diamond(&mut state, "WTYUIA", &staker);
+        let wire = one_diamond_list("WTYUIA").serialize();
+        staking_exec_hvm_external(STAKE_HACD_VMKIND, &wire, &staker, 5000, &mut state).unwrap();
+        let mint = MintStateDisk::wrap(&state);
+        let dian = lit(b"WTYUIA");
+        assert_eq!(mint.diamond(&dian).unwrap().status, DIAMOND_STATUS_STAKED);
+        staking_exec_hvm_external(
+            UNSTAKE_HACD_VMKIND,
+            &wire,
+            &staker,
+            5000 + MIN_STAKE_BLOCKS,
+            &mut state,
+        )
+        .unwrap();
+        let mint = MintStateDisk::wrap(&state);
+        assert_eq!(mint.diamond(&dian).unwrap().status, DIAMOND_STATUS_STAKING_COOLDOWN);
     }
 }

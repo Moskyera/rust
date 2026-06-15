@@ -36,13 +36,7 @@
 
 
 
-
-
-
-
-
-
-
+include!("staking_hvm.rs");
 
 /*
 
