@@ -72,7 +72,7 @@ StructFieldStruct!(StakingRecord,
 
 impl StakingRecord {
     pub fn is_active_stake(&self) -> bool {
-        self.unlock_height.is_zero()
+        self.unlock_height.uint() == 0
     }
 }
 

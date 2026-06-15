@@ -1,16 +1,4 @@
 
-use crate::interface::field::*;
-use crate::interface::chain::*;
-use crate::interface::protocol::*;
-
-use crate::sys::*;
-use crate::core::field::*;
-use crate::core::state::*;
-use crate::protocol::operate::*;
-
-use super::super::state::*;
-use super::super::component::*;
-
 fn staking_accrued_zhu(global_index: &Uint8, snapshot: &Uint8) -> u64 {
     global_index.uint().saturating_sub(snapshot.uint())
 }
@@ -274,4 +262,22 @@ pub fn staking_apply_unstake(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod staking_tests {
+    use super::*;
+
+    #[test]
+    fn fee_redirect_splits_40_60() {
+        let (pool, burn) = staking_redirect_fee_zhu(1000);
+        assert_eq!(pool, 400);
+        assert_eq!(burn, 600);
+    }
+
+    #[test]
+    fn min_stake_blocks_is_three_months_scale() {
+        assert!(MIN_STAKE_BLOCKS > 20000);
+        assert!(COOLDOWN_BLOCKS < 1000);
+    }
 }
