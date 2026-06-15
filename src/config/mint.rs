@@ -10,6 +10,8 @@ pub struct MintConf {
     /// Dev/testnet: seed one HACD + HAC to a password-derived account at genesis.
     pub hip25_testnet_seed: bool,
     pub hip25_testnet_seed_password: String,
+    /// Dev only: min_stake=5 blocks, cooldown=3 blocks (requires hip25_testnet_seed).
+    pub hip25_testnet_demo_periods: bool,
 }
 
 
@@ -29,6 +31,7 @@ impl MintConf {
             staking_activation_height: ini_must_u64(&sec, "staking_activation_height", 1),
             hip25_testnet_seed: ini_must_bool(&sec, "hip25_testnet_seed", false),
             hip25_testnet_seed_password: ini_must(&sec, "hip25_testnet_seed_password", "hip25test"),
+            hip25_testnet_demo_periods: ini_must_bool(&sec, "hip25_testnet_demo_periods", false),
         };
 
         cnf

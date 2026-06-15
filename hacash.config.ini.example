@@ -23,6 +23,8 @@ staking_activation_height = 1
 ; HACD: WTYUIA,HXVMEK,VMEKBS,UIASHX,MEKUIA — password hip25test → 1Do17BuqMj5N4EZRuquXtoCCHFZpQoHyc2
 hip25_testnet_seed = false
 hip25_testnet_seed_password = hip25test
+; Unstake demo only: min_stake=5, cooldown=3 blocks (NEVER enable on mainnet)
+hip25_testnet_demo_periods = false
 
 [miner]
 enable = false

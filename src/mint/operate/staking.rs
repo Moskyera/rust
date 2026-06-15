@@ -358,11 +358,14 @@ pub fn staking_apply_unstake(
             state.staking_record(&dianame)
         );
         let stake_height = record.stake_height.uint();
-        if height < stake_height + MIN_STAKE_BLOCKS {
+        let global_snap = state.staking_global();
+        let min_stake = global_snap.effective_min_stake_blocks();
+        let cooldown = global_snap.effective_cooldown_blocks();
+        if height < stake_height + min_stake {
             return errf!(
-                "diamond {} must remain staked for at least {} blocks (~3 months)",
+                "diamond {} must remain staked for at least {} blocks",
                 dianame.readable(),
-                MIN_STAKE_BLOCKS
+                min_stake
             );
         }
 
@@ -371,7 +374,7 @@ pub fn staking_apply_unstake(
         diaitem.status = DIAMOND_STATUS_STAKING_COOLDOWN;
         state.set_diamond(&dianame, &diaitem);
 
-        let unlock_height = height + COOLDOWN_BLOCKS;
+        let unlock_height = height + cooldown;
         let cooldown_record = StakingRecord {
             stake_height: record.stake_height.clone(),
             unlock_height: BlockHeight::from(unlock_height),

@@ -87,6 +87,8 @@ StructFieldStruct!(GlobalStakingState,
     unlock_queue_tail   : Uint5
     activation_height   : BlockHeight
     event_log_tail      : Uint5
+    demo_min_stake_blocks : Uint5
+    demo_cooldown_blocks  : Uint5
 );
 
 impl GlobalStakingState {
@@ -96,6 +98,16 @@ impl GlobalStakingState {
 
     pub fn is_active_at(&self, height: u64) -> bool {
         height >= self.activation_height.uint()
+    }
+
+    pub fn effective_min_stake_blocks(&self) -> u64 {
+        let v = self.demo_min_stake_blocks.uint();
+        if v > 0 { v } else { MIN_STAKE_BLOCKS }
+    }
+
+    pub fn effective_cooldown_blocks(&self) -> u64 {
+        let v = self.demo_cooldown_blocks.uint();
+        if v > 0 { v } else { COOLDOWN_BLOCKS }
     }
 }
 

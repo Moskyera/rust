@@ -29,7 +29,7 @@ async fn staking_status(State(ctx): State<ApiCtx>, q: Query<QStakingStatus>) -> 
         stake_height = rec.stake_height.uint();
         unlock_height = rec.unlock_height.uint();
         if stake_height > 0 {
-            min_unstake_height = stake_height + MIN_STAKE_BLOCKS;
+            min_unstake_height = stake_height + global.effective_min_stake_blocks();
         }
         if let Ok(amt) = staking_display_accrued_reward(&global.global_reward_index, &rec) {
             accrued_reward = amt.to_unit_string(&unit);

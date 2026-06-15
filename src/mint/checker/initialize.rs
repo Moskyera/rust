@@ -8,6 +8,13 @@ fn impl_initialize(this: &BlockMintChecker, db: &mut dyn State) -> RetErr {
         let mut mint_state = MintState::wrap(db);
         let mut global = mint_state.staking_global();
         global.activation_height = BlockHeight::from(this.cnf.staking_activation_height);
+        if this.cnf.hip25_testnet_seed && this.cnf.hip25_testnet_demo_periods {
+            global.demo_min_stake_blocks = Uint5::from(5);
+            global.demo_cooldown_blocks = Uint5::from(3);
+            println!(
+                "[HIP-25 testnet demo] short periods: min_stake=5 blocks, cooldown=3 blocks"
+            );
+        }
         mint_state.set_staking_global(&global);
     }
 
