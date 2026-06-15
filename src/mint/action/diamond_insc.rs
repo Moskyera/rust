@@ -63,10 +63,15 @@ fn diamond_inscription(this: &DiamondInscription, ctx: &dyn ExecContext, sta: &m
 		return errf!("diamond inscription cost error need {} but got {}", ttcost.to_fin_string(), pcost.to_fin_string())
 	}
 
-    // change count
+    // change count + HIP-25 fee redirect (40% protocol fee → staking pool)
+    let pay_zhu = pcost.to_zhu_unsafe() as u64;
+    let (to_pool, to_burn_zhu) = staking_redirect_fee_zhu(pay_zhu);
+    if to_pool > 0 {
+        staking_deposit_fee(&mut state, to_pool);
+    }
     let mut ttcount = state.total_count();
     ttcount.diamond_engraved += this.diamonds.count().uint() as u64;
-    ttcount.diamond_insc_burn_zhu += pcost.to_zhu_unsafe() as u64;
+    ttcount.diamond_insc_burn_zhu += to_burn_zhu;
     state.set_total_count(&ttcount);
 
     drop(state);
@@ -133,9 +138,14 @@ fn diamond_inscription_clean(this: &DiamondInscriptionClear, ctx: &dyn ExecConte
 		return errf!("diamond inscription cost error need {} but got {}", ttcost.to_fin_string(), pcost.to_fin_string())
 	}
 
-    // change count
+    // change count + HIP-25 fee redirect
+    let pay_zhu = pcost.to_zhu_unsafe() as u64;
+    let (to_pool, to_burn_zhu) = staking_redirect_fee_zhu(pay_zhu);
+    if to_pool > 0 {
+        staking_deposit_fee(&mut state, to_pool);
+    }
     let mut ttcount = state.total_count();
-    ttcount.diamond_insc_burn_zhu += pcost.to_zhu_unsafe() as u64;
+    ttcount.diamond_insc_burn_zhu += to_burn_zhu;
     state.set_total_count(&ttcount);
 
     drop(state);

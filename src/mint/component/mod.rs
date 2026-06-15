@@ -22,6 +22,7 @@ include!("genesis.rs");
 include!("total.rs");
 include!("balance.rs");
 include!("diamond.rs");
+include!("staking.rs");
 include!("channel.rs");
 include!("tx.rs");
 include!("block.rs");

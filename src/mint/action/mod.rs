@@ -25,6 +25,7 @@ include!("satoshi.rs");
 include!("diamond.rs");
 include!("diamond_mint.rs");
 include!("diamond_insc.rs");
+include!("diamond_staking.rs");
 include!("channel.rs");
 include!("action.rs");
 

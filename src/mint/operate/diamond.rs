@@ -18,8 +18,14 @@ pub fn check_diamond_status(state: &mut MintState, addr_from: &Address, hacd_nam
     let diaitem = must_have!(
         format!("diamond {}", hacd_name.readable()),
         state.diamond(hacd_name));
-    if diaitem.status != DIAMOND_STATUS_NORMAL {
+    if diaitem.status == DIAMOND_STATUS_LENDING_TO_SYSTEM || diaitem.status == DIAMOND_STATUS_LENDING_TO_USER {
         return errf!("diamond {} has been mortgaged and cannot be transferred", hacd_name.readable())
+    }
+    if diamond_status_is_staking_locked(&diaitem.status) {
+        return errf!("diamond {} is staked or in unstake cooldown", hacd_name.readable())
+    }
+    if diaitem.status != DIAMOND_STATUS_NORMAL {
+        return errf!("diamond {} status {} does not allow this operation", hacd_name.readable(), diaitem.status.uint())
     }
     if *addr_from != diaitem.address {
         return errf!("diamond {} not belong to address {}", hacd_name.readable(), addr_from.readable())

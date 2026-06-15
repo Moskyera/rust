@@ -22,6 +22,9 @@ pub const ACTION_KIND_ID_DIAMOND_MINT: u16 = 4;
     DiamondInscription       // 32
     DiamondInscriptionClear  // 33
 
+    DiamondStake             // 34  HIP-25
+    DiamondUnstake           // 35  HIP-25
+
 }
 
 // reg action

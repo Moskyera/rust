@@ -123,7 +123,22 @@ pub fn do_check_insert(
     for tx in alltxs {
         if execn > 0 { // except coinbase tx
             exec_tx_actions(!not_fast_sync, cnf.chain_id, height, blkhash, &mut sub_state, store, tx.as_read())?;
-            alltxfee = alltxfee.add(&tx.fee_got())?; // fee_miner_received
+            let fee = tx.fee_got();
+            // HIP-25: redirect 40% of HACD transfer tx fees to staking pool
+            if crate::mint::operate::tx_contains_diamond_transfer(tx.as_read()) {
+                let fee_zhu = fee.to_zhu_unsafe() as u64;
+                let (to_pool, to_miner_zhu) = crate::mint::operate::staking_redirect_fee_zhu(fee_zhu);
+                if to_pool > 0 {
+                    let mut ms = crate::mint::state::MintState::wrap(&mut sub_state);
+                    crate::mint::operate::staking_deposit_fee(&mut ms, to_pool);
+                }
+                if to_miner_zhu > 0 {
+                    let miner_part = Amount::from_zhu(to_miner_zhu as i64)?;
+                    alltxfee = alltxfee.add(&miner_part)?;
+                }
+            } else {
+                alltxfee = alltxfee.add(&fee)?; // fee_miner_received
+            }
         }
         // deduct tx fee after exec all actions
         tx.execute(height, &mut sub_state)?; // coinbase and other tx
@@ -135,6 +150,8 @@ pub fn do_check_insert(
         let mut corestate = CoreState::wrap(&mut sub_state);
         operate::hac_add(&mut corestate, &miner, &alltxfee)?;
     }
+    // HIP-25: per-block staking rewards + cooldown finalization
+    crate::mint::operate::staking_on_block_close(&mut sub_state, height)?;
     // test
     Ok(sub_state)
 
