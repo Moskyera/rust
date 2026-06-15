@@ -1,0 +1,23 @@
+; HIP-25 local testnet / dev fullnode — copy to hacash.config.ini beside the binary
+[default]
+data_dir = hacash_hip25_testnet_data
+
+[server]
+enable = true
+listen = 8083
+recent_blocks = false
+average_fee_purity = false
+
+[node]
+listen = 3338
+not_find_nodes = true
+boots =
+
+[mint]
+chain_id = 1
+
+[miner]
+enable = false
+
+[diamondminer]
+enable = false
