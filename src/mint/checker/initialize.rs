@@ -15,21 +15,26 @@ fn impl_initialize(this: &BlockMintChecker, db: &mut dyn State) -> RetErr {
         let acc = Account::create_by_password(&this.cnf.hip25_testnet_seed_password)
             .map_err(|e| e.to_string())?;
         let owner = Address::cons(*acc.address());
-        let dianame = DiamondName::cons(*b"WTYUIA");
-        let dia = DiamondSto {
-            status: DIAMOND_STATUS_NORMAL,
-            address: owner.clone(),
-            prev_engraved_height: BlockHeight::from(0),
-            inscripts: Inscripts::default(),
-        };
+        let seed_diamonds: [&[u8; 6]; 5] = [
+            b"WTYUIA", b"HXVMEK", b"VMEKBS", b"UIASHX", b"MEKUIA",
+        ];
         let fee_hac = Amount::new_small(11, 244);
         let mut mint_state = MintState::wrap(db);
-        mint_state.set_diamond(&dianame, &dia);
-        diamond_owned_push_one(&mut mint_state, &owner, &dianame);
+        for name in seed_diamonds {
+            let dianame = DiamondName::cons(*name);
+            let dia = DiamondSto {
+                status: DIAMOND_STATUS_NORMAL,
+                address: owner.clone(),
+                prev_engraved_height: BlockHeight::from(0),
+                inscripts: Inscripts::default(),
+            };
+            mint_state.set_diamond(&dianame, &dia);
+            diamond_owned_push_one(&mut mint_state, &owner, &dianame);
+        }
         let mut core = CoreState::wrap(db);
         core.set_balance(&owner, &Balance::hacash(fee_hac));
         println!(
-            "[HIP-25 testnet seed] HACD WTYUIA + 11 HAC -> {} (password: {})",
+            "[HIP-25 testnet seed] 5 HACD (WTYUIA,HXVMEK,VMEKBS,UIASHX,MEKUIA) + 11 HAC -> {} (password: {})",
             owner.readable(),
             &this.cnf.hip25_testnet_seed_password
         );

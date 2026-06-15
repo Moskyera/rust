@@ -19,7 +19,8 @@ chain_id = 1
 ; HIP-25 soft-fork activation height (consensus parameter, written to chain at genesis init).
 ; Dev/testnet: 1 (active from first block). Mainnet: set announced height (30-day timelock).
 staking_activation_height = 1
-; Dev only: seed HACD WTYUIA + 10 HAC to password-derived account at genesis.
+; Dev only: seed 5 HACD + 11 HAC to password-derived account at block 1 init.
+; HACD: WTYUIA,HXVMEK,VMEKBS,UIASHX,MEKUIA — password hip25test → 1Do17BuqMj5N4EZRuquXtoCCHFZpQoHyc2
 hip25_testnet_seed = false
 hip25_testnet_seed_password = hip25test
 

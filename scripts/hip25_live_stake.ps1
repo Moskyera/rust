@@ -153,6 +153,9 @@ try {
     $bal = Invoke-HacGet "query/balance" @{ address = $SeedAddress; diamonds = "true" }
     $entry = if ($bal.list) { $bal.list[0] } else { $null }
     Write-Host "[OK] seed balance HAC=$($entry.hacash) diamonds=$($entry.diamonds)"
+    if ($entry.diamonds.Length -lt 30) {
+        throw "Expected 5 seeded HACD (30 chars), got: $($entry.diamonds)"
+    }
 
     Write-Host "Waiting for on-chain stake confirmation..."
     $status = $null

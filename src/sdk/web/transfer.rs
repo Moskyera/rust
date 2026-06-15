@@ -1,75 +1,18 @@
-static mut API_RETURN_JSON: bool = true;
-
-
-
-
-/*
-#[no_mangle]
-pub extern fn trs_test(x: i32) -> i32 {
-    let mut bts = vec![1,0,5,1,1,1,1,1,1,1];
-    bts[1] = x;
-    if x > 100 {
-        panic!("error more 100")
-    }
-    let mut res = 0;
-    for v in bts {
-        res += v;
-    }
-    res + 10
-}
-*/
-
-
-
-#[no_mangle]
-pub extern fn trs_test(x: i32) -> usize {
-    let mut bt = field_bnk::Fixed4::default();
-    let data = vec![x as u8 + 1, x as u8 + 2, x as u8 + 3, x as u8 + 4];
-    let mut res = bt.parse(&data, 0).unwrap();
-    let vals = bt.serialize();
-    res += 1;
-    res = res + vals[x as usize] as usize;
-    res += x as usize;
-    let vvs = bt.hex().into_bytes();
-    res += vvs[2] as usize;
-    res
-
-    // x as usize + data[0] as usize
-    // x as usize + 1
-}
+use chrono::Utc;
 
 use crate::core::account::Account;
+use crate::core::field::diamond::DiamondNameListMax200;
+use crate::mint::action::{DiamondFromToTransfer, DiamondSingleTransfer, DiamondStake, DiamondUnstake};
+use crate::protocol::action::{
+    HacFromToTransfer, HacToTransfer, SatoshiFromToTransfer, SatoshiToTransfer, SubChainID,
+};
+use crate::protocol::transaction::TransactionType2;
 
-#[no_mangle]
-pub extern fn create_acc_random() -> usize {
-    let acc = Account::create_by_password(&"123456".to_string());
-    if let Err(e) = acc {
-        return 0
-    } 
-    let accstr = acc.unwrap().readable().clone();
-    let bts = accstr.as_bytes();
-
-    bts[1] as usize
-
-}
-
-
-//////////////////////////////
-#[no_mangle]
-pub extern fn set_api_return_json() {
-}
-
-
-
-
-
-
-fn if_add_chain_id(chain_id: u64, tx: &mut impl Transaction) {
-    // act
+fn if_add_chain_id(chain_id: u64, tx: &mut TransactionType2) {
     if chain_id > 0 {
-        let mut act = action::new_CheckChainID();
+        let mut act = SubChainID::new();
         act.chain_id = Uint8::from(chain_id);
-        tx.append_action(Box::new(act));
+        let _ = tx.push_action(Box::new(act));
     }
 }
 
@@ -81,163 +24,289 @@ fn get_time_set(timestamp: i64) -> i64 {
     time_set
 }
 
+fn parse_diamond_list(diamond_name_list: String) -> Result<DiamondNameListMax200, String> {
+    DiamondNameListMax200::from_readable(&diamond_name_list).map_err(|e| e.to_string())
+}
+
+fn stake_tx_json(
+    tx: &TransactionType2,
+    dlist: &DiamondNameListMax200,
+    fee: &Amount,
+    acc: &Account,
+    time_set: i64,
+    action_label: &str,
+) -> String {
+    let ok = format!(
+        r##""tx_hash":"{}","tx_body":"{}","action":"{}","diamond_count":{},"diamonds":"{}","fee":"{}","main_address":"{}","timestamp":{}"##,
+        tx.hash().hex(),
+        hex::encode(tx.serialize()),
+        action_label,
+        dlist.count().uint(),
+        dlist.readable(),
+        fee.to_fin_string(),
+        acc.readable(),
+        time_set
+    );
+    format!("{{{}}}", ok)
+}
+
+fn build_signed_stake_tx(
+    chain_id: u64,
+    from_pass: String,
+    diamond_name_list: String,
+    fee: String,
+    timestamp: i64,
+    stake: bool,
+) -> String {
+    let time_set = get_time_set(timestamp);
+    let dlist = or_return! { "Diamond Name parse", parse_diamond_list(diamond_name_list) };
+    let fee = or_return! { "Fee parse", Amount::from_string_unsafe(&fee) };
+    let acc = or_return! { "From Account", Account::create_by(&from_pass) };
+    let mut tx = TransactionType2::build(*acc.address(), fee.clone());
+    tx.timestamp = Timestamp::from(time_set as u64);
+    if_add_chain_id(chain_id, &mut tx);
+    if stake {
+        let mut act = DiamondStake::new();
+        act.diamonds = dlist.clone();
+        let _ = tx.push_action(Box::new(act));
+    } else {
+        let mut act = DiamondUnstake::new();
+        act.diamonds = dlist.clone();
+        let _ = tx.push_action(Box::new(act));
+    }
+    let _ = tx.fill_sign(&acc);
+    let label = if stake { "stake" } else { "unstake" };
+    stake_tx_json(&tx, &dlist, &fee, &acc, time_set, label)
+}
 
 #[wasm_bindgen]
-pub fn general_transfer(chain_id: u64, from_pass: String, to_addr: String, amountex: String, fee: String, timestamp: i64) -> String {
-    let amount = amountex.clone().to_uppercase().replace(" ","");
-    // HACD
-    let res1 = DiamondListMax200::parse_from_list(amount.clone());
-    if let Ok(diamonds) = res1 {
-        return hacd_transfer(chain_id, from_pass.clone(), from_pass.clone(), to_addr, amount, fee, timestamp);
-    }    
-    // SAT
-    let res2 = amount.find("SAT"); // SAT, SATS, SATOSHI, SATOSHIS
-    if let Some(_) = res2 {
-        let v = amount.replace("S","").replace("AT","").replace("OHI","");
+pub fn trs_test(x: i32) -> usize {
+    let mut bt = field_bnk::Fixed4::default();
+    let data = vec![x as u8 + 1, x as u8 + 2, x as u8 + 3, x as u8 + 4];
+    let mut res = bt.parse(&data, 0).unwrap();
+    let vals = bt.serialize();
+    res += 1;
+    res = res + vals[x as usize] as usize;
+    res += x as usize;
+    let vvs = bt.hex().into_bytes();
+    res += vvs[2] as usize;
+    res
+}
+
+#[wasm_bindgen]
+pub fn create_acc_random() -> usize {
+    let acc = Account::create_by_password(&"123456".to_string());
+    if let Err(_) = acc {
+        return 0;
+    }
+    let accstr = acc.unwrap().readable().clone();
+    let bts = accstr.as_bytes();
+    bts[1] as usize
+}
+
+#[wasm_bindgen]
+pub fn set_api_return_json() {}
+
+#[wasm_bindgen]
+pub fn general_transfer(
+    chain_id: u64,
+    from_pass: String,
+    to_addr: String,
+    amountex: String,
+    fee: String,
+    timestamp: i64,
+) -> String {
+    let amount = amountex.clone().to_uppercase().replace(" ", "");
+    if DiamondNameListMax200::from_readable(&amount).is_ok() {
+        return hacd_transfer(
+            chain_id,
+            from_pass.clone(),
+            from_pass.clone(),
+            to_addr,
+            amount,
+            fee,
+            timestamp,
+        );
+    }
+    let res2 = amount.find("SAT");
+    if res2.is_some() {
+        let v = amount.replace("S", "").replace("AT", "").replace("OHI", "");
         if let Ok(sat) = v.parse::<u64>() {
-            return sat_transfer(chain_id, from_pass.clone(), from_pass.clone(), to_addr, sat, fee, timestamp);
+            return sat_transfer(
+                chain_id,
+                from_pass.clone(),
+                from_pass.clone(),
+                to_addr,
+                sat,
+                fee,
+                timestamp,
+            );
         }
     }
-    // HAC
-    let res3 =  Amount::from_string_unsafe(&amount);
-    if let Ok(hac) = res3 {
+    if Amount::from_string_unsafe(&amount).is_ok() {
         return hac_transfer(chain_id, from_pass.clone(), to_addr, amount, fee, timestamp);
     }
-
-    // AMOUNT ERROR
-    or_return!{"Amount format", Err(amount)};
-
-    return "[ERROR]".to_string()
+    or_return! { "Amount format", Err(amount) };
+    "[ERROR]".to_string()
 }
 
-
-
-
 #[wasm_bindgen]
-pub fn hac_transfer(chain_id: u64, from_pass: String, to_addr: String, amount: String, fee: String, timestamp: i64) -> String {
+pub fn hac_transfer(
+    chain_id: u64,
+    from_pass: String,
+    to_addr: String,
+    amount: String,
+    fee: String,
+    timestamp: i64,
+) -> String {
     let time_set = get_time_set(timestamp);
-    // amount
-    let amt = or_return!{ "Amount parse", Amount::from_string_unsafe(&amount) };
-    let fee = or_return!{ "Fee parse", Amount::from_string_unsafe(&fee) };
-    let acc = or_return!{ "From Account", Account::create_by(&from_pass) };
-    let toaddr = or_return!{ "To Address", Address::from_readable(&to_addr) };
-    // tx
-    let mut tx = transaction::new_type_2(acc.address(), &fee, time_set);
-    // chain id
+    let amt = or_return! { "Amount parse", Amount::from_string_unsafe(&amount) };
+    let fee = or_return! { "Fee parse", Amount::from_string_unsafe(&fee) };
+    let acc = or_return! { "From Account", Account::create_by(&from_pass) };
+    let toaddr = or_return! { "To Address", Address::from_readable(&to_addr) };
+    let mut tx = TransactionType2::build(*acc.address(), fee.clone());
+    tx.timestamp = Timestamp::from(time_set as u64);
     if_add_chain_id(chain_id, &mut tx);
-    // actions
-    let act = action_create!{ HacTransfer,
-        to_address: toaddr.clone(),
-        amount: amt.clone()
-    };
-    tx.append_action(Box::new(act));
-    // sign
-    tx.fill_sign(&acc);
-
-    // ok
-    // format!("{},{},{},{}", hex::encode(2u64.to_be_bytes()), hex::encode(Uint1::from_uint(2)), tx.hash().hex(), hex::encode(tx.serialize()))
-    // format!("{},{},{},{},{},{},{},{}", tx.hash().hex(), hex::encode(tx.serialize()), chain_id, acc.readable(), toaddr.readable(), amt.to_fin_string(), fee.to_fin_string(), time_set)
-    // format!("{},{},{},{},{}", tx.hash().hex(), hex::encode(tx.serialize()), acc.readable(), acc.readable(), time_set)
-
-    let ok = format!(r##""tx_hash":"{}","tx_body":"{}","amount":"{}","fee":"{}","payment_address":"{}","fee_address":"{}","collection_address":"{}","timestamp":{}"##, 
-        tx.hash().hex(), hex::encode(tx.serialize()), amt.to_fin_string(), fee.to_fin_string(), acc.readable(), acc.readable(), toaddr.readable(), time_set);
+    let mut act = HacToTransfer::new();
+    act.to = AddrOrPtr::from_addr(toaddr.clone());
+    act.hacash = amt.clone();
+    let _ = tx.push_action(Box::new(act));
+    let _ = tx.fill_sign(&acc);
+    let ok = format!(
+        r##""tx_hash":"{}","tx_body":"{}","amount":"{}","fee":"{}","payment_address":"{}","fee_address":"{}","collection_address":"{}","timestamp":{}"##,
+        tx.hash().hex(),
+        hex::encode(tx.serialize()),
+        amt.to_fin_string(),
+        fee.to_fin_string(),
+        acc.readable(),
+        acc.readable(),
+        toaddr.readable(),
+        time_set
+    );
     format!("{{{}}}", ok)
 }
 
-
 #[wasm_bindgen]
-pub fn sat_transfer(chain_id: u64, from_pass: String, fee_pass: String, to_addr: String, satoshi: u64, fee: String, timestamp: i64) -> String {
+pub fn sat_transfer(
+    chain_id: u64,
+    from_pass: String,
+    fee_pass: String,
+    to_addr: String,
+    satoshi: u64,
+    fee: String,
+    timestamp: i64,
+) -> String {
     let time_set = get_time_set(timestamp);
-    // amount
-    let sat = Satoshi::from_uint(satoshi);
-    let fee = or_return!{ "Fee parse", Amount::from_string_unsafe(&fee) };
-    let acc = or_return!{ "From Account", Account::create_by(&from_pass) };
-    let feeacc = or_return!{ "Fee Account", Account::create_by(&fee_pass) };
-    let toaddr = or_return!{ "To Address", Address::from_readable(&to_addr) };
-    // tx
+    let sat = Satoshi::from(satoshi);
+    let fee = or_return! { "Fee parse", Amount::from_string_unsafe(&fee) };
+    let acc = or_return! { "From Account", Account::create_by(&from_pass) };
+    let feeacc = or_return! { "Fee Account", Account::create_by(&fee_pass) };
+    let toaddr = or_return! { "To Address", Address::from_readable(&to_addr) };
     let is_main_single = feeacc.address() == acc.address();
-    let mut tx = transaction::new_type_2(feeacc.address(), &fee, time_set);
-    // chain id
+    let mut tx = TransactionType2::build(*feeacc.address(), fee.clone());
+    tx.timestamp = Timestamp::from(time_set as u64);
     if_add_chain_id(chain_id, &mut tx);
-    // actions
     if is_main_single {
-        let act = action_create!{ SatTransfer,
-            to_address: toaddr.clone(),
-            satoshi: sat.clone()
-        };
-        tx.append_action(Box::new(act));
-    }else{
-        let act = action_create!{ FromToSatTransfer,
-            from_address: acc.address().clone(),
-            to_address: toaddr.clone(),
-            satoshi: sat.clone()
-        };
-        tx.append_action(Box::new(act));
+        let mut act = SatoshiToTransfer::new();
+        act.to = AddrOrPtr::from_addr(toaddr.clone());
+        act.satoshi = sat.clone();
+        let _ = tx.push_action(Box::new(act));
+    } else {
+        let mut act = SatoshiFromToTransfer::new();
+        act.from = AddrOrPtr::from_addr(acc.address().clone());
+        act.to = AddrOrPtr::from_addr(toaddr.clone());
+        act.satoshi = sat.clone();
+        let _ = tx.push_action(Box::new(act));
     }
-    // sign
-    tx.fill_sign(&acc);
+    let _ = tx.fill_sign(&acc);
     if !is_main_single {
-        tx.fill_sign(&feeacc);
+        let _ = tx.fill_sign(&feeacc);
     }
-
-    // ok
-    // format!("{},{},{},{}", hex::encode(2u64.to_be_bytes()), hex::encode(Uint1::from_uint(2)), tx.hash().hex(), hex::encode(tx.serialize()))
-    // format!("{},{},{},{},{},{},{},{}", tx.hash().hex(), hex::encode(tx.serialize()), chain_id, acc.readable(), toaddr.readable(), amt.to_fin_string(), fee.to_fin_string(), time_set)
-    // format!("{},{},{},{},{}", tx.hash().hex(), hex::encode(tx.serialize()), acc.readable(), feeacc.readable(), time_set)
-
-    let ok = format!(r##""tx_hash":"{}","tx_body":"{}","amount":"{} SAT","fee":"{}","payment_address":"{}","fee_address":"{}","collection_address":"{}","timestamp":{}"##, 
-        tx.hash().hex(), hex::encode(tx.serialize()), sat.to_u64(), fee.to_fin_string(), acc.readable(), feeacc.readable(), toaddr.readable(), time_set);
+    let ok = format!(
+        r##""tx_hash":"{}","tx_body":"{}","amount":"{} SAT","fee":"{}","payment_address":"{}","fee_address":"{}","collection_address":"{}","timestamp":{}"##,
+        tx.hash().hex(),
+        hex::encode(tx.serialize()),
+        sat.to_u64(),
+        fee.to_fin_string(),
+        acc.readable(),
+        feeacc.readable(),
+        toaddr.readable(),
+        time_set
+    );
     format!("{{{}}}", ok)
-
 }
-
 
 #[wasm_bindgen]
-pub fn hacd_transfer(chain_id: u64, from_pass: String, fee_pass: String, to_addr: String, diamond_name_list: String, fee: String, timestamp: i64) -> String {
+pub fn hacd_transfer(
+    chain_id: u64,
+    from_pass: String,
+    fee_pass: String,
+    to_addr: String,
+    diamond_name_list: String,
+    fee: String,
+    timestamp: i64,
+) -> String {
     let time_set = get_time_set(timestamp);
-    // data
-    
-    let dlist = or_return!{ "Diamond Name parse", DiamondListMax200::parse_from_list(diamond_name_list) };
-    let fee = or_return!{ "Fee parse", Amount::from_string_unsafe(&fee) };
-    let acc = or_return!{ "From Account", Account::create_by(&from_pass) };
-    let feeacc = or_return!{ "Fee Account", Account::create_by(&fee_pass) };
-    let toaddr = or_return!{ "To Address", Address::from_readable(&to_addr) };
-    // tx
+    let dlist = or_return! { "Diamond Name parse", parse_diamond_list(diamond_name_list) };
+    let fee = or_return! { "Fee parse", Amount::from_string_unsafe(&fee) };
+    let acc = or_return! { "From Account", Account::create_by(&from_pass) };
+    let feeacc = or_return! { "Fee Account", Account::create_by(&fee_pass) };
+    let toaddr = or_return! { "To Address", Address::from_readable(&to_addr) };
     let is_main_single = feeacc.address() == acc.address();
-    let mut tx = transaction::new_type_2(feeacc.address(), &fee, time_set);
-    // chain id
+    let mut tx = TransactionType2::build(*feeacc.address(), fee.clone());
+    tx.timestamp = Timestamp::from(time_set as u64);
     if_add_chain_id(chain_id, &mut tx);
-    // actions
-    if is_main_single && dlist.len() == 1 {
-        let act = action_create!{ HacdTransfer,
-            diamond: dlist[0],
-            to_address: toaddr.clone()
-        };
-        tx.append_action(Box::new(act));
-    }else{
-        let act = action_create!{ HacdTransferMultiple,
-            from_address: acc.address().clone(),
-            to_address: toaddr.clone(),
-            diamond_list: dlist.clone()
-        };
-        tx.append_action(Box::new(act));
+    if is_main_single && dlist.count().uint() == 1 {
+        let mut act = DiamondSingleTransfer::new();
+        act.diamond = dlist.lists[0].clone();
+        act.to = AddrOrPtr::from_addr(toaddr.clone());
+        let _ = tx.push_action(Box::new(act));
+    } else {
+        let mut act = DiamondFromToTransfer::new();
+        act.from = AddrOrPtr::from_addr(acc.address().clone());
+        act.to = AddrOrPtr::from_addr(toaddr.clone());
+        act.diamonds = dlist.clone();
+        let _ = tx.push_action(Box::new(act));
     }
-    // sign
-    tx.fill_sign(&acc);
+    let _ = tx.fill_sign(&acc);
     if !is_main_single {
-        tx.fill_sign(&feeacc);
+        let _ = tx.fill_sign(&feeacc);
     }
-    
-    // ok
-    // format!("{},{},{},{}", hex::encode(2u64.to_be_bytes()), hex::encode(Uint1::from_uint(2)), tx.hash().hex(), hex::encode(tx.serialize()))
-    // format!("{},{},{},{},{},{},{},{}", tx.hash().hex(), hex::encode(tx.serialize()), chain_id, acc.readable(), toaddr.readable(), amt.to_fin_string(), fee.to_fin_string(), time_set)
-    // format!("{},{},{},{},{}", tx.hash().hex(), hex::encode(tx.serialize()), acc.readable(), feeacc.readable(), time_set)
-
-    let ok = format!(r##""tx_hash":"{}","tx_body":"{}","diamond_count":{},"diamonds":"{}","fee":"{}","payment_address":"{}","fee_address":"{}","collection_address":"{}","timestamp":{}"##, 
-        tx.hash().hex(), hex::encode(tx.serialize()), dlist.len(), dlist.to_string(), fee.to_fin_string(), acc.readable(), feeacc.readable(), toaddr.readable(), time_set);
+    let ok = format!(
+        r##""tx_hash":"{}","tx_body":"{}","diamond_count":{},"diamonds":"{}","fee":"{}","payment_address":"{}","fee_address":"{}","collection_address":"{}","timestamp":{}"##,
+        tx.hash().hex(),
+        hex::encode(tx.serialize()),
+        dlist.count().uint(),
+        dlist.readable(),
+        fee.to_fin_string(),
+        acc.readable(),
+        feeacc.readable(),
+        toaddr.readable(),
+        time_set
+    );
     format!("{{{}}}", ok)
-
 }
 
+/// HIP-25: stake owned HACD (action kind 34).
+#[wasm_bindgen]
+pub fn hacd_stake(
+    chain_id: u64,
+    from_pass: String,
+    diamond_name_list: String,
+    fee: String,
+    timestamp: i64,
+) -> String {
+    build_signed_stake_tx(chain_id, from_pass, diamond_name_list, fee, timestamp, true)
+}
 
-
+/// HIP-25: unstake HACD after min stake period (action kind 35).
+#[wasm_bindgen]
+pub fn hacd_unstake(
+    chain_id: u64,
+    from_pass: String,
+    diamond_name_list: String,
+    fee: String,
+    timestamp: i64,
+) -> String {
+    build_signed_stake_tx(chain_id, from_pass, diamond_name_list, fee, timestamp, false)
+}

@@ -1,7 +1,7 @@
 
 
 // We need the trait in scope to use Utc::timestamp().
-use chrono::{TimeZone, Utc, Duration};
+use chrono::{TimeZone, Utc};
 
 use wasm_bindgen::prelude::*;
 
@@ -9,9 +9,9 @@ use crate::core::field_bnk;
 use crate::core::field_bnk::*;
 use crate::core::interface::field::*;
 use crate::core::interface::transaction::*;
-use crate::core::protocol::action;
-use crate::core::protocol::action::*;
-use crate::core::protocol::transaction;
+use crate::protocol::action;
+use crate::protocol::action::*;
+use crate::protocol::transaction;
 
 /******** sdk ********/
 
@@ -31,4 +31,3 @@ include!{"amount.rs"}
 include!{"account.rs"}
 include!{"sign.rs"}
 include!{"transfer.rs"}
-

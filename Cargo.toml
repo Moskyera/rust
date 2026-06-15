@@ -3,16 +3,21 @@ name = "hacash"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = []
+sdk = ["wasm-bindgen"]
+
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 
-# [lib]
-# name = "hacash_sdk"
-# # version = "0.1.0"
-# crate-type = ["staticlib", "cdylib"]
+[lib]
+name = "hacash_sdk"
+path = "src/sdk_lib.rs"
+crate-type = ["cdylib"]
+required-features = ["sdk"]
 
 
 [build-dependencies]
@@ -48,6 +53,7 @@ axum = "0.7.5"
 spmc = "0.3.0"
 termsize = "0.1.9"
 reqwest = { version = "0.12.5", features = ["blocking"] }
+wasm-bindgen = { version = "0.2.87", optional = true }
 
 [dev-dependencies]
 tempfile = "3.10.1"
@@ -57,7 +63,6 @@ tempfile = "3.10.1"
 # leveldb-sys = "2.0.9"
 # rusty-leveldb = "3.0.0"
 # leveldb = "0.8.6"
-# wasm-bindgen = "0.2.87"
 
 
 
