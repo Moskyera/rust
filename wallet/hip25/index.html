@@ -393,7 +393,10 @@
 
     function parseSdkJson(raw) {
       if (!raw || raw.startsWith("[ERROR]")) throw new Error(raw || "SDK error");
-      return JSON.parse(`{${raw}}`);
+      const trimmed = raw.trim();
+      // hacd_stake / hacd_unstake already return a full JSON object
+      if (trimmed.startsWith("{")) return JSON.parse(trimmed);
+      return JSON.parse(`{${trimmed}}`);
     }
 
     function loadSdkScript() {

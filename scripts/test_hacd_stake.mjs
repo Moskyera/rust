@@ -31,7 +31,7 @@ await ctx.wasm_bindgen({ module_or_path: wasm });
 
 const raw = ctx.wasm_bindgen.hacd_stake(1n, "hip25test", "WTYUIA", "0:247", 1718496000n);
 if (raw.startsWith("[ERROR]")) throw new Error(raw);
-const tx = JSON.parse(`{${raw}}`);
+const tx = JSON.parse(raw.trim().startsWith("{") ? raw.trim() : `{${raw.trim()}}`);
 console.log("hacd_stake OK", tx.tx_hash);
 
 const base = process.env.HACASH_RPC || "http://127.0.0.1:8083";
