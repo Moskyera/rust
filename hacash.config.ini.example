@@ -15,7 +15,8 @@ boots =
 
 [mint]
 chain_id = 1
-; HIP-25 soft-fork: staking rules apply from this block height (1 = active from genesis on dev)
+; HIP-25 soft-fork activation height (consensus parameter, written to chain at genesis init).
+; Dev/testnet: 1 (active from first block). Mainnet: set announced height (30-day timelock).
 staking_activation_height = 1
 
 [miner]

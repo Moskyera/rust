@@ -106,7 +106,62 @@ async fn staking_global(State(ctx): State<ApiCtx>, _q: Query<QStakingGlobal>) ->
         "reward_pool_pending_zhu", global.reward_pool_zhu.uint(),
         "global_reward_index", global.global_reward_index.uint(),
         "activation_height", global.activation_height.uint(),
+        "event_count", global.event_log_tail.uint(),
         "paused", global.is_paused(),
+    };
+    api_data(data)
+}
+
+defineQueryObject!{ QStakingEvents,
+    from, String, s!("0"),
+    limit, String, s!("50"),
+}
+
+async fn staking_events(State(ctx): State<ApiCtx>, q: Query<QStakingEvents>) -> impl IntoResponse {
+    ctx_mintstate!(ctx, mintstate);
+    q_unit!(q, unit);
+    let from = q.from.parse::<u64>().unwrap_or(0);
+    let mut limit = q.limit.parse::<u64>().unwrap_or(50);
+    if limit == 0 {
+        limit = 50;
+    }
+    if limit > 200 {
+        limit = 200;
+    }
+    let global = mintstate.staking_global();
+    let tail = global.event_log_tail.uint();
+    let end = (from + limit).min(tail);
+    let mut items: Vec<serde_json::Value> = Vec::new();
+    for id in from..end {
+        let Some(ev) = mintstate.staking_event(&Uint5::from(id)) else {
+            continue;
+        };
+        let literal = if ev.diamond.readable().trim().is_empty() {
+            "".to_string()
+        } else {
+            ev.diamond.readable()
+        };
+        let staker = if ev.staker.readable().is_empty() {
+            "".to_string()
+        } else {
+            ev.staker.readable()
+        };
+        items.push(json!({
+            "id": id,
+            "kind": staking_event_kind_label(&ev.kind),
+            "height": ev.height.uint(),
+            "literal": literal,
+            "staker": staker,
+            "unlock_height": ev.unlock_height.uint(),
+            "reward": ev.reward.to_unit_string(&unit),
+            "shares": ev.shares.uint(),
+        }));
+    }
+    let data = jsondata!{
+        "from", from,
+        "limit", limit,
+        "total", tail,
+        "events", items,
     };
     api_data(data)
 }

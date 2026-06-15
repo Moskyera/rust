@@ -6,8 +6,8 @@
  * See HIP-25 for the full protocol specification.
  */
 
-/// 40% of eligible inscription protocol fees and transfer fees → reward pool
-pub const STAKING_FEE_SHARE_PERCENT: u64 = 40;
+/// 22% of eligible inscription protocol fees and transfer fees → reward pool
+pub const STAKING_FEE_SHARE_PERCENT: u64 = 22;
 
 /// ~3 days cooldown after unstake (1000 blocks ≈ 3.5 days per HIP-15)
 pub const COOLDOWN_BLOCKS: u64 = 864;
@@ -20,6 +20,12 @@ pub const STAKE_HACD_VMKIND: u8 = 0x01;
 
 /// HVM external action opcode (HIP-21)
 pub const UNSTAKE_HACD_VMKIND: u8 = 0x02;
+
+/// On-chain staking event kinds (HIP-25 Events section)
+pub const STAKING_EVENT_STAKED: Uint1 = Uint1::from(1);
+pub const STAKING_EVENT_UNSTAKE_REQUESTED: Uint1 = Uint1::from(2);
+pub const STAKING_EVENT_UNSTAKED: Uint1 = Uint1::from(3);
+pub const STAKING_EVENT_REWARD_DISTRIBUTED: Uint1 = Uint1::from(4);
 
 /// Diamond is locked and earning rewards
 pub const DIAMOND_STATUS_STAKED: Uint1 = Uint1::from(4);
@@ -52,6 +58,22 @@ pub fn staking_status_label(status: &Uint1) -> &'static str {
     "unknown"
 }
 
+pub fn staking_event_kind_label(kind: &Uint1) -> &'static str {
+    if *kind == STAKING_EVENT_STAKED {
+        return "Staked";
+    }
+    if *kind == STAKING_EVENT_UNSTAKE_REQUESTED {
+        return "UnstakeRequested";
+    }
+    if *kind == STAKING_EVENT_UNSTAKED {
+        return "Unstaked";
+    }
+    if *kind == STAKING_EVENT_REWARD_DISTRIBUTED {
+        return "RewardDistributed";
+    }
+    "unknown"
+}
+
 /**
  * Global staking pool and reward index.
  * Singleton key: &[2, 3] in MintState (see state/def.rs).
@@ -64,6 +86,7 @@ StructFieldStruct!(GlobalStakingState,
     unlock_queue_head   : Uint5
     unlock_queue_tail   : Uint5
     activation_height   : BlockHeight
+    event_log_tail      : Uint5
 );
 
 impl GlobalStakingState {
@@ -104,4 +127,18 @@ StructFieldStruct!(StakingUnlockEntry,
     diamond       : DiamondName
     staker        : Address
     reward        : Amount
+);
+
+/**
+ * Append-only HIP-25 event log entry.
+ * Keyed by monotonic Uint5 id in MintState (see state/def.rs).
+ */
+StructFieldStruct!(StakingEvent,
+    kind          : Uint1
+    height        : BlockHeight
+    diamond       : DiamondName
+    staker        : Address
+    unlock_height : BlockHeight
+    reward        : Amount
+    shares        : Uint5
 );

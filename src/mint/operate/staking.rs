@@ -44,7 +44,7 @@ pub fn staking_redirect_fee_zhu(fee_zhu: u64) -> (u64, u64) {
     (to_pool, to_burn)
 }
 
-/// HIP-25: 40% of total transfer fee → pool; remainder follows burn/miner split.
+/// HIP-25: 22% of total transfer fee → pool; remainder follows burn/miner split.
 pub fn staking_split_transfer_tx_fee(total: &Amount, burn_90: bool) -> Ret<(u64, Amount)> {
     let total_zhu = total.to_zhu_unsafe() as u64;
     let (to_pool, remainder_zhu) = staking_redirect_fee_zhu(total_zhu);
@@ -59,6 +59,14 @@ pub fn staking_split_transfer_tx_fee(total: &Amount, burn_90: bool) -> Ret<(u64,
     Ok((to_pool, miner))
 }
 
+fn staking_push_event(state: &mut MintState, event: &StakingEvent) {
+    let mut global = state.staking_global();
+    let id = global.event_log_tail.uint();
+    state.set_staking_event(&Uint5::from(id), event);
+    global.event_log_tail = Uint5::from(id + 1);
+    state.set_staking_global(&global);
+}
+
 pub fn staking_deposit_fee(state: &mut MintState, fee_zhu: u64) {
     if fee_zhu == 0 {
         return;
@@ -68,7 +76,7 @@ pub fn staking_deposit_fee(state: &mut MintState, fee_zhu: u64) {
     state.set_staking_global(&global);
 }
 
-pub fn staking_distribute_rewards(state: &mut MintState) -> Ret<()> {
+pub fn staking_distribute_rewards(state: &mut MintState, height: u64) -> Ret<()> {
     let mut global = state.staking_global();
     let shares = global.total_staked_shares.uint();
     let pool = global.reward_pool_zhu.uint();
@@ -88,6 +96,21 @@ pub fn staking_distribute_rewards(state: &mut MintState) -> Ret<()> {
         global.reward_pool_zhu = Uint8::from(pool - distributed);
     }
     state.set_staking_global(&global);
+    if distributed > 0 {
+        let reward = Amount::from_zhu(distributed as i64).unwrap_or_default();
+        staking_push_event(
+            state,
+            &StakingEvent {
+                kind: STAKING_EVENT_REWARD_DISTRIBUTED,
+                height: BlockHeight::from(height),
+                diamond: DiamondName::default(),
+                staker: Address::default(),
+                unlock_height: BlockHeight::from(0),
+                reward,
+                shares: Uint5::from(shares),
+            },
+        );
+    }
     Ok(())
 }
 
@@ -116,6 +139,19 @@ fn staking_finalize_unlock(mint_state: &mut MintState, entry: &StakingUnlockEntr
     diaitem.status = DIAMOND_STATUS_NORMAL;
     mint_state.set_diamond(dianame, &diaitem);
     mint_state.del_staking_record(dianame);
+
+    staking_push_event(
+        mint_state,
+        &StakingEvent {
+            kind: STAKING_EVENT_UNSTAKED,
+            height: entry.unlock_height.clone(),
+            diamond: entry.diamond.clone(),
+            staker: entry.staker.clone(),
+            unlock_height: entry.unlock_height.clone(),
+            reward: entry.reward.clone(),
+            shares: Uint5::from(0),
+        },
+    );
 
     Ok(())
 }
@@ -174,7 +210,7 @@ pub fn staking_on_block_close(base_state: &mut dyn State, height: u64) -> Ret<()
     drop(mint_state);
     {
         let mut mint_state = MintState::wrap(base_state);
-        staking_distribute_rewards(&mut mint_state)?;
+        staking_distribute_rewards(&mut mint_state, height)?;
     }
     staking_process_unlock_queue(base_state, height)?;
     Ok(())
@@ -270,9 +306,24 @@ pub fn staking_apply_stake(
         state.set_staking_record(&dianame, &record);
         global.total_staked_shares =
             Uint5::from(global.total_staked_shares.uint() + 1);
+
+        staking_push_event(
+            state,
+            &StakingEvent {
+                kind: STAKING_EVENT_STAKED,
+                height: BlockHeight::from(height),
+                diamond: dianame.clone(),
+                staker: staker.clone(),
+                unlock_height: BlockHeight::from(0),
+                reward: Amount::default(),
+                shares: global.total_staked_shares.clone(),
+            },
+        );
     }
 
-    state.set_staking_global(&global);
+    let mut final_global = state.staking_global();
+    final_global.total_staked_shares = global.total_staked_shares;
+    state.set_staking_global(&final_global);
     Ok(())
 }
 
@@ -341,6 +392,19 @@ pub fn staking_apply_unstake(
             reward,
         };
         staking_enqueue_unlock(state, &entry)?;
+
+        staking_push_event(
+            state,
+            &StakingEvent {
+                kind: STAKING_EVENT_UNSTAKE_REQUESTED,
+                height: BlockHeight::from(height),
+                diamond: dianame.clone(),
+                staker: staker.clone(),
+                unlock_height: BlockHeight::from(unlock_height),
+                reward: entry.reward.clone(),
+                shares: Uint5::from(0),
+            },
+        );
     }
 
     Ok(())
@@ -399,10 +463,10 @@ mod staking_tests {
     }
 
     #[test]
-    fn fee_redirect_splits_40_60() {
+    fn fee_redirect_splits_22_78() {
         let (pool, burn) = staking_redirect_fee_zhu(1000);
-        assert_eq!(pool, 400);
-        assert_eq!(burn, 600);
+        assert_eq!(pool, 220);
+        assert_eq!(burn, 780);
     }
 
     #[test]
@@ -462,7 +526,7 @@ mod staking_tests {
         let mut mint = MintState::wrap(&mut state);
         staking_apply_stake(&mut mint, &staker, &list, stake_h).unwrap();
         staking_deposit_fee(&mut mint, 1000);
-        staking_distribute_rewards(&mut mint).unwrap();
+        staking_distribute_rewards(&mut mint, stake_h).unwrap();
         let unstake_h = stake_h + MIN_STAKE_BLOCKS;
         staking_apply_unstake(&mut mint, &staker, &list, unstake_h).unwrap();
         let unlock_h = unstake_h + COOLDOWN_BLOCKS;
@@ -486,7 +550,7 @@ mod staking_tests {
         staking_apply_stake(&mut mint, &s1, &one_diamond_list("WTYUIA"), 100).unwrap();
         staking_apply_stake(&mut mint, &s2, &one_diamond_list("HXVMEK"), 100).unwrap();
         staking_deposit_fee(&mut mint, 1000);
-        staking_distribute_rewards(&mut mint).unwrap();
+        staking_distribute_rewards(&mut mint, 100).unwrap();
         let g = mint.staking_global();
         assert_eq!(g.global_reward_index.uint(), 500);
         let r1 = mint.staking_record(&lit(b"WTYUIA")).unwrap();
@@ -537,16 +601,16 @@ mod staking_tests {
     fn transfer_fee_redirect_uses_total_fee_not_fee_got() {
         let total = Amount::from_zhu(1000).unwrap();
         let (pool, miner) = staking_split_transfer_tx_fee(&total, false).unwrap();
-        assert_eq!(pool, 400);
-        assert_eq!(miner.to_zhu_unsafe() as u64, 600);
+        assert_eq!(pool, 220);
+        assert_eq!(miner.to_zhu_unsafe() as u64, 780);
     }
 
     #[test]
     fn transfer_fee_redirect_applies_burn_90_on_remainder() {
         let total = Amount::from_zhu(1000).unwrap();
         let (pool, miner) = staking_split_transfer_tx_fee(&total, true).unwrap();
-        assert_eq!(pool, 400);
-        assert_eq!(miner.to_zhu_unsafe() as u64, 60);
+        assert_eq!(pool, 220);
+        assert_eq!(miner.to_zhu_unsafe() as u64, 78);
     }
 
     #[test]
@@ -562,7 +626,7 @@ mod staking_tests {
         staking_apply_stake(&mut mint, &s1, &list1, stake_h).unwrap();
         staking_apply_stake(&mut mint, &s2, &one_diamond_list("HXVMEK"), stake_h).unwrap();
         staking_deposit_fee(&mut mint, 1000);
-        staking_distribute_rewards(&mut mint).unwrap();
+        staking_distribute_rewards(&mut mint, stake_h).unwrap();
         let pending_at_unstake = staking_accrued_amount(
             &mint.staking_global().global_reward_index,
             &mint.staking_record(&lit(b"WTYUIA")).unwrap().reward_index,
@@ -571,7 +635,7 @@ mod staking_tests {
         let unstake_h = stake_h + MIN_STAKE_BLOCKS;
         staking_apply_unstake(&mut mint, &s1, &list1, unstake_h).unwrap();
         staking_deposit_fee(&mut mint, 2000);
-        staking_distribute_rewards(&mut mint).unwrap();
+        staking_distribute_rewards(&mut mint, unstake_h).unwrap();
         let rec = mint.staking_record(&lit(b"WTYUIA")).unwrap();
         let displayed = staking_display_accrued_reward(
             &mint.staking_global().global_reward_index,
@@ -599,6 +663,34 @@ mod staking_tests {
         mint.set_staking_global(&global);
         let err = staking_apply_stake(&mut mint, &staker, &list, 1000).unwrap_err();
         assert!(format!("{}", err).contains("not active"));
+    }
+
+    #[test]
+    fn stake_emits_staked_on_chain_event() {
+        let (_dir, mut state) = test_state();
+        let staker = test_staker();
+        seed_diamond(&mut state, "WTYUIA", &staker);
+        let list = one_diamond_list("WTYUIA");
+        let mut mint = MintState::wrap(&mut state);
+        staking_apply_stake(&mut mint, &staker, &list, 1000).unwrap();
+        assert_eq!(mint.staking_global().event_log_tail.uint(), 1);
+        let ev = mint.staking_event(&Uint5::from(0)).unwrap();
+        assert_eq!(ev.kind, STAKING_EVENT_STAKED);
+        assert_eq!(ev.diamond.readable(), "WTYUIA");
+        assert_eq!(ev.staker, staker);
+    }
+
+    #[test]
+    fn script_execute_stake_via_hvm_wire() {
+        use crate::vm::exec_staking_script;
+        let (_dir, mut state) = test_state();
+        let staker = test_staker();
+        seed_diamond(&mut state, "WTYUIA", &staker);
+        let mut wire = vec![STAKE_HACD_VMKIND];
+        wire.extend(one_diamond_list("WTYUIA").serialize());
+        exec_staking_script(&wire, &staker, 5000, &mut state).unwrap();
+        let mint = MintStateDisk::wrap(&state);
+        assert_eq!(mint.diamond(&lit(b"WTYUIA")).unwrap().status, DIAMOND_STATUS_STAKED);
     }
 
     #[test]

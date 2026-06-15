@@ -16,15 +16,21 @@
     (self, ctx, state, store, gas), // params
     true, // burn 90
     [], // req sign
-    { 
-        errf!("not support")
-        /*
-        let addr = Fixed21{ bytes: [0u8; 21] };
-        let codes = [74u8,89];
-        // ctx.vm()?.main_call(&addr, &codes)
-        Ok(vec![])
-        */
+    {
+        script_execute_staking(self, ctx, state)
     }
+}
+
+fn script_execute_staking(
+    this: &ScriptExecute,
+    ctx: &dyn ExecContext,
+    sta: &mut dyn State,
+) -> Ret<Vec<u8>> {
+    let staker = ctx.main_address();
+    let height = ctx.pending_height();
+    let codes = this.codes.as_ref();
+    vm::exec_staking_script(codes, staker, height, sta)?;
+    Ok(vec![])
 }
 
 

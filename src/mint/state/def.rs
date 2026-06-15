@@ -31,6 +31,7 @@ defineChainStateOperationInstance!{
         &[2, 24], channel            , ChannelId        , ChannelSto
         &[2, 25], staking_record     , DiamondName      , StakingRecord
         &[2, 26], staking_unlock_entry, Uint5           , StakingUnlockEntry
+        &[2, 27], staking_event        , Uint5           , StakingEvent
     )
 }
 
