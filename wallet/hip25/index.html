@@ -139,7 +139,7 @@
 <body>
   <header>
     <h1>HIP-25 HACD Staking</h1>
-    <span class="tag">Wallet MVP</span>
+    <span class="tag" id="networkTag">Wallet MVP</span>
   </header>
   <main>
     <section class="panel">
@@ -205,9 +205,9 @@
     </section>
   </main>
   <script>
+    const MAINNET_CHAIN_ID = "0";
     const TESTNET = {
       address: "1Do17BuqMj5N4EZRuquXtoCCHFZpQoHyc2",
-      password: "hip25test",
       fee: "0:247",
     };
 
@@ -216,7 +216,7 @@
     }
 
     const $ = (id) => document.getElementById(id);
-    const state = { diamonds: [], height: 0, selected: new Set(), wasm: null };
+    const state = { diamonds: [], height: 0, selected: new Set(), wasm: null, hip25Dev: true };
     let loadRetryTimer = null;
 
     function schedulePortfolioRetry() {
@@ -233,10 +233,22 @@
       loadRetryTimer = null;
     }
 
-    function base() {
+    function sdkOrigin() {
+      return window.location.origin;
+    }
+
+    function apiBase() {
       let b = $("rpc").value.trim().replace(/\/$/, "");
-      if (!b) b = window.location.origin;
+      if (!b) b = sdkOrigin();
       return b;
+    }
+
+    function warnRpcOriginMismatch() {
+      const api = apiBase();
+      const sdk = sdkOrigin();
+      if (api !== sdk) {
+        log(`RPC URL (${api}) differs from wallet origin (${sdk}); WASM SDK always loads from wallet origin`, "err");
+      }
     }
 
     function log(msg, cls = "") {
@@ -249,12 +261,12 @@
 
     async function apiGet(path, params = {}) {
       const qs = new URLSearchParams(params).toString();
-      const url = `${base()}/${path}${qs ? "?" + qs : ""}`;
+      const url = `${apiBase()}/${path}${qs ? "?" + qs : ""}`;
       let r;
       try {
         r = await fetch(url);
       } catch (e) {
-        throw new Error(`RPC unreachable at ${base()} — run START_WALLET.bat and keep HIP25-FULLNODE open`);
+        throw new Error(`RPC unreachable at ${apiBase()} — run START_WALLET.bat and keep HIP25-FULLNODE open`);
       }
       const j = await r.json();
       if (j.ret !== 0) throw new Error(j.err || JSON.stringify(j));
@@ -263,7 +275,7 @@
 
     async function apiPost(path, body, params = {}) {
       const qs = new URLSearchParams(params).toString();
-      const url = `${base()}/${path}${qs ? "?" + qs : ""}`;
+      const url = `${apiBase()}/${path}${qs ? "?" + qs : ""}`;
       const bytes = body instanceof Uint8Array ? body : new TextEncoder().encode(body);
       const r = await fetch(url, { method: "POST", body: bytes });
       const j = await r.json();
@@ -309,7 +321,13 @@
           row.classList.toggle("selected", cb.checked);
         };
         const info = document.createElement("div");
-        info.innerHTML = `<div class="literal">${d.literal}</div><div class="meta">reward ${d.accrued_reward || "0"} · min unstake h ${d.min_unstake_height || "—"}</div>`;
+        const lit = document.createElement("div");
+        lit.className = "literal";
+        lit.textContent = d.literal;
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        meta.textContent = `reward ${d.accrued_reward || "0"} · min unstake h ${d.min_unstake_height ?? "—"}`;
+        info.append(lit, meta);
         const badge = document.createElement("span");
         badge.className = `badge badge-${d.status}`;
         badge.textContent = d.status;
@@ -336,6 +354,7 @@
       const latest = await apiGet("query/latest");
       state.height = latest.height;
       $("sHeight").textContent = latest.height;
+      state.hip25Dev = !!latest.hip25_dev;
       if (latest.chain_id !== undefined) {
         const nodeChain = String(latest.chain_id);
         const cur = $("chainId").value.trim();
@@ -344,6 +363,7 @@
           if (cur && cur !== nodeChain) log(`Chain ID synced to node (${nodeChain})`, "err");
         }
         $("chainId").readOnly = !latest.hip25_dev;
+        $("networkTag").textContent = latest.hip25_dev ? "HIP-25 testnet" : `Mainnet chain ${MAINNET_CHAIN_ID}`;
       }
 
       const global = await apiGet("query/staking/global");
@@ -403,16 +423,15 @@
     function parseSdkJson(raw) {
       if (!raw || raw.startsWith("[ERROR]")) throw new Error(raw || "SDK error");
       const trimmed = raw.trim();
-      // hacd_stake / hacd_unstake already return a full JSON object
-      if (trimmed.startsWith("{")) return JSON.parse(trimmed);
-      return JSON.parse(`{${trimmed}}`);
+      if (!trimmed.startsWith("{")) throw new Error("SDK returned invalid JSON");
+      return JSON.parse(trimmed);
     }
 
     function loadSdkScript() {
       return new Promise((resolve, reject) => {
         if (typeof wasm_bindgen === "function") return resolve();
         const s = document.createElement("script");
-        s.src = `${base()}/pkg/hacash_sdk.js`;
+        s.src = `${sdkOrigin()}/pkg/hacash_sdk.js`;
         s.onload = () => resolve();
         s.onerror = () => reject(new Error("failed to load /pkg/hacash_sdk.js"));
         document.head.appendChild(s);
@@ -423,7 +442,7 @@
       const el = $("sdkStatus");
       try {
         await loadSdkScript();
-        const wasmUrl = `${base()}/pkg/hacash_sdk_bg.wasm`;
+        const wasmUrl = `${sdkOrigin()}/pkg/hacash_sdk_bg.wasm`;
         await wasm_bindgen(wasmUrl);
         state.wasm = wasm_bindgen;
         el.textContent = "WASM SDK: ready — hacd_stake / hacd_unstake (password stays in browser)";
@@ -440,7 +459,11 @@
       const pass = $("prikey").value.trim();
       if (!pass) throw new Error("Password required for local signing");
       const fee = $("fee").value.trim();
-      const chainId = BigInt($("chainId").value.trim() || "1");
+      const chainIdStr = $("chainId").value.trim();
+      if (!state.hip25Dev && chainIdStr !== MAINNET_CHAIN_ID) {
+        throw new Error(`Mainnet wallet requires chain ID ${MAINNET_CHAIN_ID}`);
+      }
+      const chainId = BigInt(chainIdStr || MAINNET_CHAIN_ID);
       const sel = [...state.selected];
       if (!sel.length) throw new Error("Select at least one HACD");
       const diamonds = sel.join(",");
@@ -452,19 +475,25 @@
       const tx = parseSdkJson(raw);
       log(`Signed locally ${tx.tx_hash}`);
       const submitted = await apiPost("submit/transaction", hexToBytes(tx.tx_body));
+      $("prikey").value = "";
       log(`Submitted ${submitted.hash}`, "ok");
       setTimeout(loadPortfolio, 3000);
     }
 
-    $("rpc").value = window.location.origin || "http://127.0.0.1:8083";
+    $("rpc").value = sdkOrigin() || "http://127.0.0.1:8083";
+    $("rpc").addEventListener("change", warnRpcOriginMismatch);
+    $("rpc").addEventListener("blur", warnRpcOriginMismatch);
 
     $("btnTestnet").onclick = () => {
+      if (!state.hip25Dev) {
+        log("Testnet seed fill is disabled on mainnet nodes", "err");
+        return;
+      }
       $("address").value = TESTNET.address;
-      $("prikey").value = TESTNET.password;
       $("fee").value = TESTNET.fee;
       $("chainId").value = "1";
-      $("rpc").value = window.location.origin || "http://127.0.0.1:8083";
-      log("Filled HIP-25 testnet seed account");
+      $("rpc").value = sdkOrigin();
+      log("Filled HIP-25 testnet seed address (enter testnet password locally)");
       loadPortfolio().catch((e) => log(e.message, "err"));
     };
 
@@ -486,13 +515,18 @@
       try {
         const latest = await apiGet("query/latest");
         if (latest.chain_id !== undefined) $("chainId").value = String(latest.chain_id);
+        state.hip25Dev = !!latest.hip25_dev;
         if (latest.hip25_dev) {
+          $("networkTag").textContent = "HIP-25 testnet";
           if (!$("address").value.trim()) {
             $("address").value = TESTNET.address;
             setTimeout(() => loadPortfolio().catch((e) => log(e.message, "err")), 500);
           }
         } else {
           $("btnTestnet").style.display = "none";
+          $("chainId").value = MAINNET_CHAIN_ID;
+          $("chainId").readOnly = true;
+          $("networkTag").textContent = `Mainnet chain ${MAINNET_CHAIN_ID}`;
         }
       } catch (e) {
         log(e.message, "err");

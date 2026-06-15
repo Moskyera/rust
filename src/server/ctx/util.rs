@@ -115,7 +115,7 @@ pub fn get_id_range(max: i64, page: i64, limit: i64, instart: i64, decs: bool) -
         rng = (end+1..start+1).rev().collect();
     }
     // ok
-    rng.retain(|&x| x>=1 || x<=max);
+    rng.retain(|&x| x >= 1 && x <= max);
     rng
 }
 

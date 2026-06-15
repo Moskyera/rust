@@ -12,7 +12,6 @@ pub struct ApiCtx {
     pub blocks: BlockCaches,
     pub miner_worker_notice_count: Arc<Mutex<u64>>,
     pub listen_host: String,
-    pub rate_limiter: Arc<crate::server::security::RateLimiter>,
     blocks_max: usize, // 4
 
 }
@@ -25,7 +24,6 @@ impl ApiCtx {
             blocks: Arc::default(),
             miner_worker_notice_count: Arc::default(),
             listen_host,
-            rate_limiter: Arc::new(crate::server::security::RateLimiter::new(60, 60)),
             blocks_max: 4,
         }
     }

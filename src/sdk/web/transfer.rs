@@ -59,7 +59,7 @@ fn stake_tx_json(
 
 fn build_signed_stake_tx(
     chain_id: u64,
-    from_pass: String,
+    mut from_pass: String,
     diamond_name_list: String,
     fee: String,
     timestamp: i64,
@@ -70,6 +70,7 @@ fn build_signed_stake_tx(
     let dlist = or_return! { "Diamond Name parse", parse_diamond_list(diamond_name_list) };
     let fee = or_return! { "Fee parse", Amount::from_string_unsafe(&fee) };
     let acc = or_return! { "From Account", Account::create_by(&from_pass) };
+    from_pass.clear();
     let addr = or_return! { "From Address", Address::from_readable(acc.readable()) };
     let mut tx = TransactionType2::build(addr, fee.clone());
     tx.timestamp = Timestamp::from(time_set as u64);
@@ -95,6 +96,7 @@ fn build_signed_stake_tx(
     stake_tx_json(&tx, &dlist, &fee, &acc, time_set, label)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[wasm_bindgen]
 pub fn trs_test(x: i32) -> usize {
     let mut bt = Fixed4::default();
@@ -109,6 +111,7 @@ pub fn trs_test(x: i32) -> usize {
     res
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[wasm_bindgen]
 pub fn create_acc_random() -> usize {
     let acc = Account::create_by_password(&"123456".to_string());

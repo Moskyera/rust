@@ -3,12 +3,15 @@
 impl HNode for HacashNode {
 
     fn submit_transaction(&self, txpkg: &Box<dyn TxPkg>, in_async: bool) -> RetErr {
-        // check signature
         let txread = txpkg.objc().as_ref().as_read();
         txread.verify_signature()?;
-        // try execute tx
         self.engine.try_execute_tx(txread)?;
-        // add to pool
+        if self.engine.config().is_open_miner() {
+            let txbody = txpkg.body().clone().into_vec();
+            if let Ok(pkg) = crate::protocol::transaction::create_pkg(BytesW4::from_vec(txbody)) {
+                let _ = self.txpool.insert(pkg);
+            }
+        }
         let msghdl = self.msghdl.clone();
         let txbody = txpkg.body().clone().into_vec();
         let runobj = async move {
@@ -16,7 +19,7 @@ impl HNode for HacashNode {
         };
         if in_async {
             tokio::spawn(runobj);
-        }else{
+        } else {
             new_current_thread_tokio_rt().block_on(runobj);
         }
         Ok(())

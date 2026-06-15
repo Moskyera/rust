@@ -71,7 +71,11 @@ impl MsgHandler {
         // println!("on_message peer={} ty={} len={}", peer.nick(), ty, body.len());
 
         match ty {
-            MSG_TX_SUBMIT =>      { self.blktx.send(BlockTxArrive::Tx(Some(peer.clone()), body)).await; },
+            MSG_TX_SUBMIT =>      {
+                if body.len() <= TX_SUBMIT_MAX_BYTES {
+                    self.blktx.send(BlockTxArrive::Tx(Some(peer.clone()), body)).await;
+                }
+            },
             MSG_BLOCK_DISCOVER => { self.blktx.send(BlockTxArrive::Block(Some(peer.clone()), body)).await; },
             MSG_BLOCK_HASH =>     { self.receive_hashs(peer, body).await; },
             MSG_REQ_BLOCK_HASH => { self.send_hashs(peer, body).await; },

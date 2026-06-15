@@ -1,31 +1,31 @@
 
 
 async fn handle_new_tx(this: Arc<MsgHandler>, peer: Option<Arc<Peer>>, body: Vec<u8>) {
-    // println!("1111111 handle_txblock_arrive Tx, peer={} len={}", peer.nick(), body.clone().len());
+    if body.len() > TX_SUBMIT_MAX_BYTES {
+        return;
+    }
     let engcnf = this.engine.config();
-    // parse
     let txpkg = transaction::create_pkg(BytesW4::from_vec(body));
-    if let Err(e) = txpkg {
-        return // parse tx error
+    if let Err(_) = txpkg {
+        return;
     }
     let txpkg = txpkg.unwrap();
-    // tx hash with fee
+    let txread = txpkg.objc().as_ref().as_read();
+    if txread.verify_signature().is_err() {
+        return;
+    }
+    if this.engine.try_execute_tx(txread).is_err() {
+        return;
+    }
     let hxfe = txpkg.objc().hash_with_fee();
     let (already, knowkey) = check_know(&this.knows, &hxfe, peer.clone());
     if already {
-        return  // alreay know it
+        return;
     }
-    // println!("p2p recv new tx: {}, {}", txpkg.objc().hash().half(), hxfe.nonce());
     let txdatas = txpkg.body().clone().into_vec();
     if engcnf.is_open_miner() {
-        // try execute tx
-        if let Err(..) = this.engine.try_execute_tx(txpkg.objc().as_ref().as_read()) {
-            return // tx execute fail
-        }
-        // add to pool
-        this.txpool.insert(txpkg);
+        let _ = this.txpool.insert(txpkg);
     }
-    // broadcast
     let p2p = this.p2pmng.lock().unwrap();
     let p2p = p2p.as_ref().unwrap();
     p2p.broadcast_message(0/*not delay*/, knowkey, MSG_TX_SUBMIT, txdatas);
@@ -140,9 +140,10 @@ fn drain_all_block_txs(eng: Arc<dyn EngineRead>, txpool: Arc<dyn TxPool>, txs: V
 
 // clean_
 fn clean_invalid_normal_txs(eng: Arc<dyn EngineRead>, txpool: Arc<dyn TxPool>, blkhei: u64) {
-    // already minted hacd number
-    let sta = eng.state();
-    let ldn = MintStateDisk::wrap(sta.as_ref()).latest_diamond().number.uint();
+    let Some(sta) = eng.try_state() else {
+        return;
+    };
+    let _ldn = MintStateDisk::wrap(sta.as_ref()).latest_diamond().number.uint();
     txpool.drain_filter_at(&|a: &Box<dyn TxPkg>| {
         match eng.try_execute_tx( a.objc().as_read() ) {
             Err(..) => true, // delete
@@ -154,8 +155,9 @@ fn clean_invalid_normal_txs(eng: Arc<dyn EngineRead>, txpool: Arc<dyn TxPool>, b
 
 // clean_
 fn clean_invalid_diamond_mint_txs(eng: Arc<dyn EngineRead>, txpool: Arc<dyn TxPool>, blkhei: u64) {
-    // already minted hacd number
-    let sta = eng.state();
+    let Some(sta) = eng.try_state() else {
+        return;
+    };
     let curdn = MintStateDisk::wrap(sta.as_ref()).latest_diamond().number.uint();
     txpool.drain_filter_at(&|a: &Box<dyn TxPkg>| {
         let tx = a.objc().as_read();

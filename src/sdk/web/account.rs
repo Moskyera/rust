@@ -1,4 +1,5 @@
 
+#[cfg(not(target_arch = "wasm32"))]
 #[wasm_bindgen]
 pub fn create_account_by(s: String) -> String {
     let acc = or_return!{ "create account", Account::create_by(&s) };

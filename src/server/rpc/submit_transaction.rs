@@ -14,7 +14,7 @@ async fn submit_transaction(State(ctx): State<ApiCtx>, q: Query<Q4396>, body: By
     }
     let txpkg = txpkg.unwrap();
     // try submit
-    let is_async = true;
+    let is_async = false;
     if let Err(e) = ctx.hcshnd.submit_transaction(&txpkg, is_async) {
         return api_error(&e)
     }

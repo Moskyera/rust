@@ -21,6 +21,12 @@ pub trait EngineRead: Send + Sync {
     fn average_fee_purity(&self) -> u64 { 0 } // 1w zhu(shuo) / 200byte(1trs)
 
     fn try_execute_tx(&self, _: &dyn TransactionRead) -> RetErr { panic_never_call_this!() }
+    fn try_execute_txs_cumulative(&self, txs: &[&dyn TransactionRead]) -> RetErr {
+        for tx in txs {
+            self.try_execute_tx(*tx)?;
+        }
+        Ok(())
+    }
     // realtime average fee purity
     // fn avgfee(&self) -> u32 { 0 }
 }

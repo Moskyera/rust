@@ -144,6 +144,10 @@ fn is_rate_limited_post(path: &str, method: &Method) -> bool {
             || path.starts_with("/util/"))
 }
 
+fn is_rate_limited_get(path: &str, method: &Method) -> bool {
+    *method == Method::GET && path.starts_with("/submit/miner/")
+}
+
 pub fn origin_allowed(origin: &str, listen_host: &str, listen_port: u16) -> bool {
     let o = origin.trim();
     if is_loopback_host(listen_host) {
@@ -208,9 +212,10 @@ pub async fn security_middleware(
         }
     }
 
-    if is_rate_limited_post(&path, &method) {
+    if is_rate_limited_post(&path, &method) || is_rate_limited_get(&path, &method) {
         let ip = client_ip(&request);
-        let rate_key = format!("post:{ip}:{}", path);
+        let verb = if method == Method::POST { "post" } else { "get" };
+        let rate_key = format!("{verb}:{ip}:{}", path);
         if !mw.rate_limiter.allow(&rate_key) {
             return (
                 StatusCode::TOO_MANY_REQUESTS,

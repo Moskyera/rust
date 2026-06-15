@@ -11,6 +11,8 @@ pub const MSG_REQ_BLOCK:           u16 = 5;
 pub const MSG_BLOCK:               u16 = 6;
 
 pub const MSG_TX_SUBMIT:           u16 = 7; // new tx    arrived
+/// Max serialized tx size accepted from P2P (aligned with RPC body limit).
+pub const TX_SUBMIT_MAX_BYTES: usize = 256 * 1024;
 pub const MSG_BLOCK_DISCOVER:      u16 = 8; // new block arrived
 
 // msg stuff

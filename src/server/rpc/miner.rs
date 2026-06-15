@@ -38,7 +38,7 @@ fn update_miner_pending_block(block: BlockV1, cbtx: TransactionCoinbase) {
 fn get_miner_pending_block_stuff(is_detail: bool, is_transaction: bool, is_stuff: bool, is_base64: bool) -> Response {
     let mut stuff = MINER_PENDING_BLOCK.lock().unwrap();
     if stuff.len() == 0 {
-        panic!("get miner pending block stuff error: block not init!");
+        return api_error("miner pending block not initialized; enable miner and wait for first template");
     };
     let stuff = &mut stuff[0];
     
@@ -198,14 +198,20 @@ fn append_valid_tx_pick_from_txpool(nexthei: u64, trslen: &mut usize, trshxs: &m
     macro_rules! check_pick_one_tx {
         ($a: expr) => {
             let txr = $a.objc().as_ref().as_read();
-            if let Err(..) = txr.verify_signature() {
-                return true // sign fail, ignore, next
+            if txr.verify_signature().is_err() {
+                return true;
             }
-            if let Err(..) = engine.try_execute_tx(txr) {
-                return true // execute fail, ignore, next
+            let mut sim: Vec<&dyn TransactionRead> = trs
+                .list()
+                .iter()
+                .skip(1)
+                .map(|t| t.as_ref().as_read())
+                .collect();
+            sim.push(txr);
+            if engine.try_execute_txs_cumulative(&sim).is_err() {
+                return true;
             }
-        }
-
+        };
     }
 
     // pick one diamond mint tx
