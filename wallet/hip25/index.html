@@ -369,7 +369,7 @@
         const wasmUrl = `${base()}/pkg/hacash_sdk_bg.wasm`;
         await wasm_bindgen(wasmUrl);
         state.wasm = wasm_bindgen;
-        el.textContent = "WASM SDK: ready — local sign only (password never sent to RPC)";
+        el.textContent = "WASM SDK: ready — hacd_stake / hacd_unstake (password stays in browser)";
         el.className = "meta ok";
         updateActionButtons();
       } catch (e) {
@@ -383,33 +383,18 @@
       const pass = $("prikey").value.trim();
       if (!pass) throw new Error("Password required for local signing");
       const fee = $("fee").value.trim();
-      const addr = $("address").value.trim();
+      const chainId = BigInt($("chainId").value.trim() || "1");
       const sel = [...state.selected];
       if (!sel.length) throw new Error("Select at least one HACD");
       const diamonds = sel.join(",");
-      const ts = txTimestamp();
-      const txJson = JSON.stringify({
-        main_address: addr,
-        timestamp: ts,
-        fee,
-        actions: [{ kind, diamonds }],
-      });
-      log(`[RPC] create/transaction kind=${kind} for ${diamonds}…`);
-      const built = await apiPost("create/transaction", txJson, { action: "true", signature: "true" });
-      const txBytes = hexToBytes(built.body);
-      const hashHex = built.hash_with_fee || built.hash;
-      log(`[WASM] sign hash ${hashHex.slice(0, 16)}…`);
-      const sigRaw = state.wasm.sign(pass, hashHex);
-      const sig = parseSdkJson(sigRaw);
-      log(`[RPC] attach signature for ${sig.address}…`);
-      const signed = await apiPost("util/transaction/sign", txBytes, {
-        pubkey: sig.pubkey,
-        sigdts: sig.sigdts,
-        signature: "true",
-        action: "true",
-      });
-      const signedBytes = hexToBytes(signed.body);
-      const submitted = await apiPost("submit/transaction", signedBytes);
+      const stake = kind === 34;
+      const fn = stake ? state.wasm.hacd_stake : state.wasm.hacd_unstake;
+      const ts = BigInt(txTimestamp());
+      log(`[WASM] ${stake ? "hacd_stake" : "hacd_unstake"} for ${diamonds} (ts=${ts})…`);
+      const raw = fn(chainId, pass, diamonds, fee, ts);
+      const tx = parseSdkJson(raw);
+      log(`Signed locally ${tx.tx_hash}`);
+      const submitted = await apiPost("submit/transaction", hexToBytes(tx.tx_body));
       log(`Submitted ${submitted.hash}`, "ok");
       setTimeout(loadPortfolio, 3000);
     }

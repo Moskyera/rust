@@ -77,13 +77,20 @@ fn build_signed_stake_tx(
     if stake {
         let mut act = DiamondStake::new();
         act.diamonds = dlist.clone();
-        let _ = tx.push_action(Box::new(act));
+        if let Err(e) = tx.push_action(Box::new(act)) {
+            return format!("[ERROR] push stake action: {}", e);
+        }
     } else {
         let mut act = DiamondUnstake::new();
         act.diamonds = dlist.clone();
-        let _ = tx.push_action(Box::new(act));
+        if let Err(e) = tx.push_action(Box::new(act)) {
+            return format!("[ERROR] push unstake action: {}", e);
+        }
     }
-    let _ = tx.fill_sign(&acc);
+    use crate::interface::protocol::Transaction;
+    if let Err(e) = tx.fill_sign(&acc) {
+        return format!("[ERROR] fill_sign: {}", e);
+    }
     let label = if stake { "stake" } else { "unstake" };
     stake_tx_json(&tx, &dlist, &fee, &acc, time_set, label)
 }

@@ -1,9 +1,20 @@
-use chrono::{DateTime, Local, TimeZone};
+use chrono::{DateTime, Local, TimeZone, Utc};
 
 pub const TIME_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
 pub fn curtimes() -> u64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as u64
+    // std::time::SystemTime is unavailable on wasm32-unknown-unknown (browser WASM SDK).
+    #[cfg(target_arch = "wasm32")]
+    {
+        return Utc::now().timestamp() as u64;
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as u64
+    }
 }
 
 
