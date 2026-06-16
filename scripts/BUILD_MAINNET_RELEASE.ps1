@@ -6,6 +6,10 @@ $PkgDir = Join-Path $ReleaseDir "pkg"
 $WalletPkg = Join-Path $Root "wallet\hip25\pkg"
 
 Write-Host "=== HIP-25 Mainnet Release Build ===" -ForegroundColor Cyan
+$cmakeBin = "C:\Program Files\CMake\bin"
+if ((Test-Path $cmakeBin) -and ($env:PATH -notlike "*$cmakeBin*")) {
+    $env:PATH = "$cmakeBin;$env:PATH"
+}
 Set-Location $Root
 
 Write-Host "[1/3] cargo build --release ..." -ForegroundColor Yellow
@@ -13,7 +17,10 @@ cargo build --release
 if ($LASTEXITCODE -ne 0) { throw "cargo build --release failed" }
 
 Write-Host "[2/3] WASM SDK (wasm32) ..." -ForegroundColor Yellow
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
 rustup target add wasm32-unknown-unknown 2>&1 | Out-Null
+$ErrorActionPreference = $prevEap
 cargo build --features sdk --target wasm32-unknown-unknown --release --lib
 if ($LASTEXITCODE -ne 0) { throw "WASM lib build failed" }
 
