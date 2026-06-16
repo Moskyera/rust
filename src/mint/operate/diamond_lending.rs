@@ -37,11 +37,6 @@ fn mortgage_origination_fee_zhu(principal_zhu: u64) -> u64 {
     principal_zhu * MORTGAGE_ORIGINATION_FEE_BPS / 10_000
 }
 
-/// Committed interest in basis-points (0.4% × T).
-fn mortgage_committed_interest_bps(borrow_period: u64) -> u64 {
-    MORTGAGE_COMMITTED_INTEREST_BPS_PER_PERIOD * borrow_period
-}
-
 /// Elapsed full periods since contract creation.
 fn mortgage_elapsed_periods(create_height: u64, height: u64, period_blocks: u64) -> u64 {
     if height <= create_height || period_blocks == 0 {
@@ -50,12 +45,43 @@ fn mortgage_elapsed_periods(create_height: u64, height: u64, period_blocks: u64)
     (height - create_height) / period_blocks
 }
 
+/// Interest bps on principal from flat APR over elapsed blocks.
+pub fn mortgage_apr_interest_bps(elapsed_blocks: u64) -> u64 {
+    MORTGAGE_APR_BPS
+        .saturating_mul(elapsed_blocks)
+        / MORTGAGE_BLOCKS_PER_YEAR.max(1)
+}
+
+/// Private-phase interest before public window.
+fn mortgage_private_interest_bps(
+    create_height: u64,
+    height: u64,
+    period_blocks: u64,
+    borrow_period: u64,
+) -> u64 {
+    let elapsed_periods = mortgage_elapsed_periods(create_height, height, period_blocks);
+    let half = borrow_period / 2;
+
+    if elapsed_periods <= MORTGAGE_EARLY_GRACE_PERIODS {
+        return 0;
+    }
+    if elapsed_periods <= half {
+        let chargeable = elapsed_periods - MORTGAGE_EARLY_GRACE_PERIODS;
+        return MORTGAGE_EARLY_INTEREST_BPS_PER_PERIOD * chargeable;
+    }
+
+    let elapsed_blocks = height.saturating_sub(create_height);
+    mortgage_apr_interest_bps(elapsed_blocks)
+}
+
 /// Ransom amount from principal zhu and interest bps (principal × (10000 + bps) / 10000).
 fn mortgage_ransom_from_bps(principal_zhu: u64, interest_bps: u64) -> Ret<Amount> {
     let numerator = principal_zhu.saturating_mul(10_000 + interest_bps);
     let zhu = (numerator / 10_000) as i64;
     Amount::from_zhu(zhu)
 }
+
+
 
 pub fn mortgage_redeem_phase(
     contract: &DiamondSystemLending,
@@ -104,23 +130,16 @@ pub fn mortgage_calc_ransom(
 
     let interest_bps = match phase {
         MortgageRedeemPhase::Private => {
-            let elapsed = mortgage_elapsed_periods(create, height, period_blocks);
-            let half = t / 2;
-            if elapsed <= half {
-                MORTGAGE_EARLY_INTEREST_BPS_PER_PERIOD * elapsed
-            } else {
-                mortgage_committed_interest_bps(t)
-            }
+            mortgage_private_interest_bps(create, height, period_blocks, t)
         }
-        MortgageRedeemPhase::Public => mortgage_committed_interest_bps(t),
+        MortgageRedeemPhase::Public => {
+            mortgage_apr_interest_bps(height.saturating_sub(create))
+        }
         MortgageRedeemPhase::Auction => {
-            let committed_bps = mortgage_committed_interest_bps(t);
-            let max_zhu = principal_zhu.saturating_mul(10_000 + committed_bps) / 10_000;
-            let floor_zhu = principal_zhu.saturating_mul(MORTGAGE_AUCTION_FLOOR_BPS) / 10_000;
-            if height <= public_end {
-                return mortgage_ransom_from_bps(principal_zhu, committed_bps)
-                    .map(|a| (phase, a));
-            }
+            let max_bps = mortgage_apr_interest_bps(public_end.saturating_sub(create));
+            let max_zhu = principal_zhu.saturating_mul(10_000 + max_bps) / 10_000;
+            let floor_zhu =
+                principal_zhu.saturating_mul(MORTGAGE_AUCTION_FLOOR_BPS) / 10_000;
             let auction_elapsed = mortgage_elapsed_periods(public_end, height, period_blocks);
             let auction_duration = t.saturating_mul(2);
             let ransom_zhu = if auction_elapsed >= auction_duration {
@@ -517,9 +536,9 @@ mod mortgage_tests {
     }
 
     #[test]
-    fn origination_fee_is_two_percent() {
-        assert_eq!(mortgage_origination_fee_zhu(10_000), 200);
-        assert_eq!(mortgage_origination_fee_zhu(1_000_000), 20_000);
+    fn origination_fee_is_one_percent() {
+        assert_eq!(mortgage_origination_fee_zhu(10_000), 100);
+        assert_eq!(mortgage_origination_fee_zhu(1_000_000), 10_000);
     }
 
     #[test]
@@ -539,7 +558,7 @@ mod mortgage_tests {
     }
 
     #[test]
-    fn private_early_redeem_scales_quarter_percent_per_period() {
+    fn grace_period_zero_interest_for_three_periods() {
         let contract = DiamondSystemLending {
             is_ransomed: Uint1::from(0),
             create_block_height: BlockHeight::from(100),
@@ -551,32 +570,51 @@ mod mortgage_tests {
             ransom_address: Address::default(),
         };
         let (_, ransom) = mortgage_calc_ransom(&contract, &test_owner(), 130, 10).unwrap();
-        // 3 elapsed periods × 0.25% = 0.75%
+        assert_eq!(ransom, Amount::from_mei(1000).unwrap());
+    }
+
+    #[test]
+    fn private_early_redeem_scales_tenth_percent_after_grace() {
+        let contract = DiamondSystemLending {
+            is_ransomed: Uint1::from(0),
+            create_block_height: BlockHeight::from(100),
+            main_address: test_owner(),
+            mortgage_diamonds: DiamondNameListMax200::default(),
+            loan_principal: Amount::from_mei(1000).unwrap(),
+            borrow_period: Uint1::from(10),
+            ransom_block_height: BlockHeight::from(0),
+            ransom_address: Address::default(),
+        };
+        let (_, ransom) = mortgage_calc_ransom(&contract, &test_owner(), 140, 10).unwrap();
+        // 4 elapsed periods: grace 3 + 1 chargeable × 0.1% = 0.1%
         let principal_zhu = mortgage_principal_zhu(&contract.loan_principal).unwrap();
-        let expected = mortgage_ransom_from_bps(principal_zhu, 75).unwrap();
+        let expected = mortgage_ransom_from_bps(principal_zhu, 10).unwrap();
         assert_eq!(ransom.to_fin_string(), expected.to_fin_string());
     }
 
     #[test]
-    fn private_second_half_uses_committed_interest() {
+    fn apr_accrues_three_percent_per_year() {
+        assert_eq!(mortgage_apr_interest_bps(MORTGAGE_BLOCKS_PER_YEAR), 300);
         let contract = DiamondSystemLending {
             is_ransomed: Uint1::from(0),
             create_block_height: BlockHeight::from(0),
             main_address: test_owner(),
             mortgage_diamonds: DiamondNameListMax200::default(),
             loan_principal: Amount::from_mei(1000).unwrap(),
-            borrow_period: Uint1::from(4),
+            borrow_period: Uint1::from(10),
             ransom_block_height: BlockHeight::from(0),
             ransom_address: Address::default(),
         };
-        // T=4, half=2, elapsed=3 periods → committed 1.6%
-        let (_, ransom) = mortgage_calc_ransom(&contract, &test_owner(), 30, 10).unwrap();
-        let expected = Amount::from_mei(1016).unwrap();
+        let (_, ransom) =
+            mortgage_calc_ransom(&contract, &test_owner(), MORTGAGE_BLOCKS_PER_YEAR, 10)
+                .unwrap();
+        let principal_zhu = mortgage_principal_zhu(&contract.loan_principal).unwrap();
+        let expected = mortgage_ransom_from_bps(principal_zhu, 300).unwrap();
         assert_eq!(ransom.to_fin_string(), expected.to_fin_string());
     }
 
     #[test]
-    fn public_redeem_allows_anyone_at_committed_rate() {
+    fn public_redeem_allows_anyone_at_apr() {
         let contract = DiamondSystemLending {
             is_ransomed: Uint1::from(0),
             create_block_height: BlockHeight::from(0),
@@ -588,16 +626,17 @@ mod mortgage_tests {
             ransom_address: Address::default(),
         };
         let period = 10u64;
-        let public_h = 5 * period + 1;
+        let public_h = 5 * period + MORTGAGE_BLOCKS_PER_YEAR;
         let (_, ransom) =
             mortgage_calc_ransom(&contract, &test_other(), public_h, period).unwrap();
-        // 5 × 0.4% = 2%
-        let expected = Amount::from_mei(510).unwrap();
+        let principal_zhu = mortgage_principal_zhu(&contract.loan_principal).unwrap();
+        let bps = mortgage_apr_interest_bps(public_h);
+        let expected = mortgage_ransom_from_bps(principal_zhu, bps).unwrap();
         assert_eq!(ransom.to_fin_string(), expected.to_fin_string());
     }
 
     #[test]
-    fn auction_decays_to_floor_110_percent() {
+    fn auction_decays_to_floor_103_percent() {
         let contract = DiamondSystemLending {
             is_ransomed: Uint1::from(0),
             create_block_height: BlockHeight::from(0),
@@ -613,8 +652,30 @@ mod mortgage_tests {
         let floor_h = public_end + 2 * 2 * period;
         let (_, ransom) =
             mortgage_calc_ransom(&contract, &test_other(), floor_h, period).unwrap();
-        let expected = Amount::from_mei(1100).unwrap();
+        let expected = Amount::from_mei(1030).unwrap();
         assert_eq!(ransom.to_fin_string(), expected.to_fin_string());
+    }
+
+    #[test]
+    fn borrow_period_does_not_scale_total_apr() {
+        let short = DiamondSystemLending {
+            is_ransomed: Uint1::from(0),
+            create_block_height: BlockHeight::from(0),
+            main_address: test_owner(),
+            mortgage_diamonds: DiamondNameListMax200::default(),
+            loan_principal: Amount::from_mei(1000).unwrap(),
+            borrow_period: Uint1::from(5),
+            ransom_block_height: BlockHeight::from(0),
+            ransom_address: Address::default(),
+        };
+        let long = DiamondSystemLending {
+            borrow_period: Uint1::from(20),
+            ..short.clone()
+        };
+        let h = MORTGAGE_BLOCKS_PER_YEAR;
+        let (_, r_short) = mortgage_calc_ransom(&short, &test_owner(), h, 10).unwrap();
+        let (_, r_long) = mortgage_calc_ransom(&long, &test_owner(), h, 10).unwrap();
+        assert_eq!(r_short.to_fin_string(), r_long.to_fin_string());
     }
 
     #[test]
@@ -661,10 +722,10 @@ mod mortgage_tests {
         let dia = mint.diamond(&lit(b"WTYUIA")).unwrap();
         assert_eq!(dia.status, DIAMOND_STATUS_LENDING_TO_SYSTEM);
         assert_eq!(mint.mortgage_global().outstanding_ioo_zhu.uint(), 100_0000_0000);
-        assert_eq!(mint.mortgage_global().cumulative_origination_burn_zhu.uint(), 2_0000_0000);
-        // 50 HAC start - 2 HAC origination + 100 HAC loan = 148 HAC
+        assert_eq!(mint.mortgage_global().cumulative_origination_burn_zhu.uint(), 1_0000_0000);
+        // 50 HAC start - 1 HAC origination + 100 HAC loan = 149 HAC
         let bal = hac_balance(&state, &owner);
-        assert_eq!(bal, Amount::from_mei(148).unwrap());
+        assert_eq!(bal, Amount::from_mei(149).unwrap());
     }
 
     #[test]

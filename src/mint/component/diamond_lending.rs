@@ -1,22 +1,28 @@
 
 /**
- * HIP-2 v2: HACD system mortgage loan (HAC IOU against bid-burn collateral).
+ * HIP-2 v2.1: HACD system mortgage loan (HAC IOU against bid-burn collateral).
  */
 
 /// ~35 days per committed period at mainnet cadence (~5 min/block).
 pub const MORTGAGE_PERIOD_BLOCKS: u64 = 10_000;
 
-/// 2% origination fee on loan principal → burn.
-pub const MORTGAGE_ORIGINATION_FEE_BPS: u64 = 200;
+/// ~1 year of blocks at 5 min/block (365 × 24 × 12).
+pub const MORTGAGE_BLOCKS_PER_YEAR: u64 = 105_120;
 
-/// Early private-window interest: 0.25% of principal per elapsed period.
-pub const MORTGAGE_EARLY_INTEREST_BPS_PER_PERIOD: u64 = 25;
+/// 1% origination fee on loan principal → burn (v2.1).
+pub const MORTGAGE_ORIGINATION_FEE_BPS: u64 = 100;
 
-/// Committed / public interest: 0.4% of principal per committed period.
-pub const MORTGAGE_COMMITTED_INTEREST_BPS_PER_PERIOD: u64 = 40;
+/// Private grace: zero ransom interest for this many elapsed periods (~3.5 months).
+pub const MORTGAGE_EARLY_GRACE_PERIODS: u64 = 3;
 
-/// Dutch auction floor: 110% of principal.
-pub const MORTGAGE_AUCTION_FLOOR_BPS: u64 = 11_000;
+/// After grace, before private midpoint: 0.1% of principal per elapsed period.
+pub const MORTGAGE_EARLY_INTEREST_BPS_PER_PERIOD: u64 = 10;
+
+/// Flat annual rate (3%); borrow_period T sets windows only, not the rate multiplier.
+pub const MORTGAGE_APR_BPS: u64 = 300;
+
+/// Dutch auction floor: 103% of principal (v2.1).
+pub const MORTGAGE_AUCTION_FLOOR_BPS: u64 = 10_300;
 
 /// Default max outstanding IOU (zhu); governance may lower before mainnet.
 pub const MORTGAGE_DEFAULT_MAX_OUTSTANDING_ZHU: u64 = 800_000_000_000_000; // 8M HAC @ 8 decimals scale

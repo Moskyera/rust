@@ -19,9 +19,12 @@ async fn mortgage_global(State(ctx): State<ApiCtx>, _q: Query<QMortgageGlobal>) 
         "max_outstanding_ioo_zhu", global.max_outstanding_ioo_zhu.uint(),
         "period_blocks", global.effective_period_blocks(),
         "origination_fee_bps", MORTGAGE_ORIGINATION_FEE_BPS,
+        "early_grace_periods", MORTGAGE_EARLY_GRACE_PERIODS,
         "early_interest_bps_per_period", MORTGAGE_EARLY_INTEREST_BPS_PER_PERIOD,
-        "committed_interest_bps_per_period", MORTGAGE_COMMITTED_INTEREST_BPS_PER_PERIOD,
+        "apr_bps", MORTGAGE_APR_BPS,
+        "blocks_per_year", MORTGAGE_BLOCKS_PER_YEAR,
         "auction_floor_bps", MORTGAGE_AUCTION_FLOOR_BPS,
+        "economics_version", "v2.1",
     };
     api_data(data)
 }
