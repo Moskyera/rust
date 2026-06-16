@@ -55,10 +55,11 @@ async fn server_listen(mut ser: RPCServer) {
         ser.hcshnd.clone(),
         host,
     );
+    // Extension must be outermost so security_middleware can extract MiddlewareCtx.
     let app = rpc::routes(ctx)
         .layer(DefaultBodyLimit::max(RPC_BODY_LIMIT_BYTES))
-        .layer(Extension(mw))
-        .layer(axum::middleware::from_fn(security_middleware));
+        .layer(axum::middleware::from_fn(security_middleware))
+        .layer(Extension(mw));
     println!("[RPC Server] HIP-25 wallet UI: http://{addr}/hip25/wallet");
     let make_svc = app.into_make_service_with_connect_info::<SocketAddr>();
     if let Err(e) = axum::serve(listener, make_svc).await {

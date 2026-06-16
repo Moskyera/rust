@@ -116,7 +116,7 @@ pub fn do_check_insert(
     // if init genesis status
     if height == 1 {
         // state initialize 
-        mintk.initialize(&mut sub_state)?;
+        mintk.initialize(&mut sub_state, store)?;
     }
     // exec each tx
     let mut execn = 0;

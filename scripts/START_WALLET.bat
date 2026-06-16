@@ -40,6 +40,9 @@ echo staking_activation_height = 1
 echo hip25_testnet_seed = true
 echo hip25_testnet_seed_password = hip25test
 echo hip25_testnet_demo_periods = true
+echo mortgage_activation_height = 1
+echo mortgage_max_outstanding_zhu = 0
+echo hip2_testnet_demo_periods = true
 echo [miner]
 echo enable = true
 echo reward = 1Do17BuqMj5N4EZRuquXtoCCHFZpQoHyc2

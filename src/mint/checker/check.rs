@@ -43,9 +43,9 @@ impl MintChecker for BlockMintChecker {
         impl_coinbase(self, height, cbtx)
     }
 
-    fn initialize(&self, state: &mut dyn State) -> RetErr {
-        impl_initialize(self, state)
-    } 
+    fn initialize(&self, state: &mut dyn State, store: &dyn Store) -> RetErr {
+        impl_initialize(self, state, store)
+    }
 
     fn genesis(&self) -> Arc<dyn BlockPkg> {
         genesis_block_ptr()

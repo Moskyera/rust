@@ -1,8 +1,13 @@
 use crate::core::account::Account;
+use crate::interface::chain::Store;
+use crate::mint::component::*;
 use crate::mint::operate::diamond_owned_push_one;
-use crate::mint::state::MintState;
+use crate::mint::state::{MintState, MintStoreDisk};
 
-fn impl_initialize(this: &BlockMintChecker, db: &mut dyn State) -> RetErr {
+/// Demo bid-burn collateral per seeded HACD (100 HAC loan principal each).
+const HIP25_SEED_DIAMOND_BURN_MEI: u16 = 100;
+
+fn impl_initialize(this: &BlockMintChecker, db: &mut dyn State, store: &dyn Store) -> RetErr {
 
     {
         let mut mint_state = MintState::wrap(db);
@@ -44,6 +49,7 @@ fn impl_initialize(this: &BlockMintChecker, db: &mut dyn State) -> RetErr {
         ];
         let fee_hac = Amount::new_small(11, 244);
         let mut mint_state = MintState::wrap(db);
+        let mint_store = MintStoreDisk::wrap(store);
         for name in seed_diamonds {
             let dianame = DiamondName::cons(*name);
             let dia = DiamondSto {
@@ -54,12 +60,31 @@ fn impl_initialize(this: &BlockMintChecker, db: &mut dyn State) -> RetErr {
             };
             mint_state.set_diamond(&dianame, &dia);
             diamond_owned_push_one(&mut mint_state, &owner, &dianame);
+            let smelt = DiamondSmelt {
+                diamond: dianame.clone(),
+                number: DiamondNumber::from(1),
+                born_height: BlockHeight::from(1),
+                born_hash: Hash::default(),
+                prev_hash: Hash::default(),
+                miner_address: owner.clone(),
+                bid_fee: Amount::default(),
+                nonce: Fixed8::default(),
+                average_bid_burn: Uint2::from(HIP25_SEED_DIAMOND_BURN_MEI),
+                life_gene: Hash::default(),
+            };
+            mint_store.put_diamond_smelt(&dianame, &smelt);
         }
         let mut core = CoreState::wrap(db);
-        core.set_balance(&owner, &Balance::hacash(fee_hac));
+        let mut bal = Balance::hacash(fee_hac);
+        bal.diamond = DiamondNumberAuto::from(seed_diamonds.len() as u64);
+        core.set_balance(&owner, &bal);
         println!(
             "[HIP-25 testnet seed] 5 HACD (WTYUIA,HXVMEK,VMEKBS,UIASHX,MEKUIA) + 11 HAC -> {} (see docs for dev password)",
             owner.readable()
+        );
+        println!(
+            "[HIP-2 testnet seed] smelt bid-burn {} mei per HACD (mortgage principal)",
+            HIP25_SEED_DIAMOND_BURN_MEI
         );
     }
 
@@ -79,4 +104,4 @@ fn impl_initialize(this: &BlockMintChecker, db: &mut dyn State) -> RetErr {
 
     // ok
     Ok(())
-} 
+}

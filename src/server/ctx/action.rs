@@ -77,6 +77,29 @@ pub fn action_from_json(main_addr: &Address, jsonv: &serde_json::Value) -> Ret<B
         )
     }
 
+    macro_rules! j_lend_id {
+        ($k: expr) => ({
+            let Some(btstr) = jsonv[$k].as_str() else {
+                return errf!("lending_id format error")
+            };
+            let bts = match hex::decode(btstr.replace(" ", "")) {
+                Ok(b) => b,
+                _ => return errf!("lending_id hex error"),
+            };
+            if bts.len() != DIAMOND_SYSLEND_ID_SIZE {
+                return errf!(
+                    "lending_id must be {} bytes hex",
+                    DIAMOND_SYSLEND_ID_SIZE
+                );
+            }
+            let arr: [u8; DIAMOND_SYSLEND_ID_SIZE] = match bts.try_into() {
+                Ok(a) => a,
+                _ => return errf!("lending_id length error"),
+            };
+            DiamondSyslendId::cons(arr)
+        })
+    }
+
     macro_rules! j_uint5 {
         ($k: expr) => (
             j_uint!($k, u64, Uint5)
@@ -222,6 +245,18 @@ pub fn action_from_json(main_addr: &Address, jsonv: &serde_json::Value) -> Ret<B
 
     if_ret_act_ns!{ DiamondUnstake,
         diamonds, j_dias
+    }
+
+    if_ret_act!{ MortgageOpen,
+        lending_id,        j_lend_id!("lending_id")
+        mortgage_diamonds, j_dias!("diamonds")
+        loan_total_amount, j_hac!("loan")
+        borrow_period,     j_uint1!("borrow_period")
+    }
+
+    if_ret_act!{ MortgageRedeem,
+        lending_id,    j_lend_id!("lending_id")
+        ransom_amount, j_hac!("ransom")
     }
 
 
@@ -548,6 +583,43 @@ pub fn action_to_json_desc(tx: &dyn TransactionRead, act: &dyn Action,
             resjsonobj.insert("description", json!(format!(
                 "Unstake {} HACD ({})",
                 dia_num, action.diamonds.splitstr()
+            )));
+        }
+
+    }else if kind == MortgageOpen::kid() {
+
+        let action = MortgageOpen::must(&act.serialize());
+        let dia_names = action.mortgage_diamonds.readable();
+        let loan_str = action.loan_total_amount.to_unit_string(unit);
+        resjsonobj = jsondata!{
+            "lending_id", action.lending_id.hex(),
+            "diamonds", dia_names,
+            "loan", loan_str,
+            "borrow_period", action.borrow_period.uint(),
+        };
+        if ret_desc {
+            resjsonobj.insert("description", json!(format!(
+                "Mortgage open {} HACD ({}) loan {} period {}",
+                action.mortgage_diamonds.count().uint(),
+                action.mortgage_diamonds.splitstr(),
+                loan_str,
+                action.borrow_period.uint()
+            )));
+        }
+
+    }else if kind == MortgageRedeem::kid() {
+
+        let action = MortgageRedeem::must(&act.serialize());
+        let ransom_str = action.ransom_amount.to_unit_string(unit);
+        resjsonobj = jsondata!{
+            "lending_id", action.lending_id.hex(),
+            "ransom", ransom_str,
+        };
+        if ret_desc {
+            resjsonobj.insert("description", json!(format!(
+                "Mortgage redeem id {} ransom {}",
+                action.lending_id.hex(),
+                ransom_str
             )));
         }
 
