@@ -62,6 +62,17 @@ pub fn staking_status_label(status: &Uint1) -> &'static str {
     "unknown"
 }
 
+/// Wallet / RPC label including HIP-2 mortgage collateral.
+pub fn diamond_wallet_status_label(status: &Uint1) -> &'static str {
+    if *status == DIAMOND_STATUS_LENDING_TO_SYSTEM {
+        return "Mortgaged";
+    }
+    if *status == DIAMOND_STATUS_LENDING_TO_USER {
+        return "Lent";
+    }
+    staking_status_label(status)
+}
+
 pub fn staking_event_kind_label(kind: &Uint1) -> &'static str {
     if *kind == STAKING_EVENT_STAKED {
         return "Staked";

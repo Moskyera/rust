@@ -94,6 +94,62 @@ impl GlobalMortgageState {
     }
 }
 
+/// Per-owner index of active mortgage lending ids (for wallet / RPC portfolio).
+StructFieldStruct!(MortgageOwnerIndex,
+    ids : BytesW4
+);
+
+const MORTGAGE_OWNER_INDEX_MAX: usize = 64;
+
+impl MortgageOwnerIndex {
+    pub fn iter_ids(&self) -> Vec<DiamondSyslendId> {
+        let w = DIAMOND_SYSLEND_ID_SIZE;
+        let bytes = self.ids.as_ref();
+        let mut out = Vec::new();
+        for chunk in bytes.chunks(w) {
+            if chunk.len() == w {
+                out.push(DiamondSyslendId::cons(chunk.try_into().unwrap()));
+            }
+        }
+        out
+    }
+
+    pub fn push_id(&mut self, id: &DiamondSyslendId) -> Ret<()> {
+        mortgage_validate_lending_id(id)?;
+        let w = DIAMOND_SYSLEND_ID_SIZE;
+        if self.ids.length() / w >= MORTGAGE_OWNER_INDEX_MAX {
+            return errf!("mortgage owner contract index full");
+        }
+        for existing in self.iter_ids() {
+            if existing == *id {
+                return Ok(());
+            }
+        }
+        let mut bytes = id.as_ref().to_vec();
+        self.ids.append(&mut bytes);
+        Ok(())
+    }
+
+    pub fn remove_id(&mut self, id: &DiamondSyslendId) -> Ret<()> {
+        let w = DIAMOND_SYSLEND_ID_SIZE;
+        let target = id.as_ref();
+        let mut kept = Vec::new();
+        let mut removed = false;
+        for existing in self.iter_ids() {
+            if existing.as_ref() == target {
+                removed = true;
+            } else {
+                kept.extend_from_slice(existing.as_ref());
+            }
+        }
+        if !removed {
+            return Ok(());
+        }
+        self.ids = BytesW4::from_vec(kept);
+        Ok(())
+    }
+}
+
 pub fn mortgage_validate_lending_id(id: &DiamondSyslendId) -> Ret<()> {
     let bytes = id.as_ref();
     if bytes.len() != DIAMOND_SYSLEND_ID_SIZE {

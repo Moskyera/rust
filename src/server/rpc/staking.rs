@@ -20,7 +20,7 @@ async fn staking_status(State(ctx): State<ApiCtx>, q: Query<QStakingStatus>) -> 
     }
     let diaobj = diaobj.unwrap();
     let global = mintstate.staking_global();
-    let status = staking_status_label(&diaobj.status);
+    let status = diamond_wallet_status_label(&diaobj.status);
     let mut stake_height = 0u64;
     let mut unlock_height = 0u64;
     let mut min_unstake_height = 0u64;

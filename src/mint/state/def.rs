@@ -34,6 +34,7 @@ defineChainStateOperationInstance!{
         &[2, 26], staking_unlock_entry, Uint5           , StakingUnlockEntry
         &[2, 27], staking_event        , Uint5           , StakingEvent
         &[2, 28], diamond_syslend      , DiamondSyslendId , DiamondSystemLending
+        &[2, 29], mortgage_owner_index , Address          , MortgageOwnerIndex
     )
 }
 

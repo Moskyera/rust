@@ -274,6 +274,12 @@ pub fn mortgage_apply_open(
     };
     mint.set_diamond_syslend(lending_id, &contract);
 
+    let mut owner_index = mint
+        .mortgage_owner_index(owner)
+        .unwrap_or_default();
+    owner_index.push_id(lending_id)?;
+    mint.set_mortgage_owner_index(owner, &owner_index);
+
     let mut global = mint.mortgage_global();
     global.outstanding_ioo_zhu = Uint8::from(new_outstanding);
     global.cumulative_loan_zhu =
@@ -383,6 +389,17 @@ pub fn mortgage_apply_redeem(
     );
     global.active_contracts = Uint5::from(global.active_contracts.uint().saturating_sub(1));
     mint.set_mortgage_global(&global);
+
+    let owner = contract.main_address.clone();
+    let mut owner_index = mint
+        .mortgage_owner_index(&owner)
+        .unwrap_or_default();
+    owner_index.remove_id(lending_id)?;
+    if owner_index.ids.length() > 0 {
+        mint.set_mortgage_owner_index(&owner, &owner_index);
+    } else {
+        mint.del_mortgage_owner_index(&owner);
+    }
 
     mortgage_record_burn(&mut mint, ransom_zhu);
     diamond_owned_push_batch(&mut mint, redeemer, &diamonds)?;

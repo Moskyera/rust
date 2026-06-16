@@ -39,6 +39,8 @@ pub fn routes(mut ctx: ApiCtx) -> Router {
 
     .route(&query("mortgage/global"), get(mortgage_global))
     .route(&query("mortgage/contract"), get(mortgage_contract))
+    .route(&query("mortgage/portfolio"), get(mortgage_portfolio))
+    .route(&query("mortgage/principal"), get(mortgage_principal))
 
     .route(&query("fee/average"), get(fee_average))
 

@@ -1,6 +1,6 @@
 
 use crate::mint::component::*;
-use crate::mint::operate::mortgage_calc_ransom;
+use crate::mint::operate::{mortgage_calc_ransom, mortgage_compute_principal};
 
 defineQueryObject!{ QMortgageGlobal,
     __nnn_, Option<bool>, None,
@@ -32,7 +32,15 @@ async fn mortgage_global(State(ctx): State<ApiCtx>, _q: Query<QMortgageGlobal>) 
 defineQueryObject!{ QMortgageContract,
     id, String, s!(""),
     redeemer, String, s!(""),
-    height, String, s!(""),
+    height, Option<String>, None,
+}
+
+defineQueryObject!{ QMortgagePortfolio,
+    address, String, s!(""),
+}
+
+defineQueryObject!{ QMortgagePrincipal,
+    diamonds, String, s!(""),
 }
 
 async fn mortgage_contract(State(ctx): State<ApiCtx>, q: Query<QMortgageContract>) -> impl IntoResponse {
@@ -56,9 +64,11 @@ async fn mortgage_contract(State(ctx): State<ApiCtx>, q: Query<QMortgageContract
     let mut min_ransom = "0".to_string();
     if !contract.redeemed() {
         let redeemer_ads = q.redeemer.replace(" ", "").replace("\n", "");
-        let height = q.height.parse::<u64>().unwrap_or_else(|_| {
-            ctx.engine.latest_block().objc().height().uint()
-        });
+        let height = q
+            .height
+            .as_deref()
+            .and_then(|s| s.parse::<u64>().ok())
+            .unwrap_or_else(|| ctx.engine.latest_block().objc().height().uint());
         let redeemer = if redeemer_ads.is_empty() {
             contract.main_address.clone()
         } else {
@@ -93,6 +103,78 @@ async fn mortgage_contract(State(ctx): State<ApiCtx>, q: Query<QMortgageContract
         "redeem_phase", phase,
         "min_ransom", min_ransom,
         "period_blocks", period_blocks,
+    };
+    api_data(data)
+}
+
+async fn mortgage_portfolio(State(ctx): State<ApiCtx>, q: Query<QMortgagePortfolio>) -> impl IntoResponse {
+    ctx_mintstate!(ctx, mintstate);
+    q_unit!(q, unit);
+    let ads = q.address.replace(" ", "").replace("\n", "");
+    let adr = match Address::from_readable(&ads) {
+        Ok(a) => a,
+        Err(_) => return api_error("address format error"),
+    };
+    let global = mintstate.mortgage_global();
+    let period_blocks = global.effective_period_blocks();
+    let height = ctx.engine.latest_block().objc().height().uint();
+    let index = mintstate.mortgage_owner_index(&adr).unwrap_or_default();
+    let mut contracts: Vec<serde_json::Value> = Vec::new();
+    for lend_id in index.iter_ids() {
+        let Some(contract) = mintstate.diamond_syslend(&lend_id) else {
+            continue;
+        };
+        if contract.redeemed() {
+            continue;
+        }
+        let id_hex = hex::encode(lend_id.as_ref());
+        let diamonds: Vec<String> = contract
+            .mortgage_diamonds
+            .list()
+            .iter()
+            .map(|d| d.readable())
+            .collect();
+        let (phase, min_ransom) = mortgage_calc_ransom(&contract, &adr, height, period_blocks)
+            .map(|(ph, amt)| (ph.label().to_string(), amt.to_unit_string(&unit)))
+            .unwrap_or_else(|_| ("".to_string(), "0".to_string()));
+        contracts.push(json!({
+            "lending_id": id_hex,
+            "loan_principal": contract.loan_principal.to_unit_string(&unit),
+            "borrow_period": contract.borrow_period.uint(),
+            "diamonds": diamonds,
+            "create_height": contract.create_block_height.uint(),
+            "redeem_phase": phase,
+            "min_ransom": min_ransom,
+        }));
+    }
+    let data = jsondata!{
+        "address", adr.readable(),
+        "active_count", contracts.len() as u64,
+        "contracts", contracts,
+        "economics_version", "v2.1",
+    };
+    api_data(data)
+}
+
+async fn mortgage_principal(State(ctx): State<ApiCtx>, q: Query<QMortgagePrincipal>) -> impl IntoResponse {
+    ctx_mintstore!(ctx, mintstore);
+    q_unit!(q, unit);
+    let dialist = DiamondNameListMax200::from_readable(&q.diamonds.replace(" ", ""));
+    let list = match dialist {
+        Ok(l) => l,
+        Err(e) => return api_error(&format!("diamonds {}", e)),
+    };
+    if list.count().uint() == 0 {
+        return api_error("diamonds required");
+    }
+    let principal = match mortgage_compute_principal(&mintstore, &list) {
+        Ok(p) => p,
+        Err(e) => return api_error(&e),
+    };
+    let data = jsondata!{
+        "loan", principal.to_unit_string(&unit),
+        "diamonds", list.readable(),
+        "origination_fee_bps", MORTGAGE_ORIGINATION_FEE_BPS,
     };
     api_data(data)
 }

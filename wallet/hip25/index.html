@@ -213,9 +213,11 @@
         <button class="btn-primary" id="btnMortgageOpen" disabled>Open mortgage (15)</button>
         <button class="btn-unstake" id="btnMortgageRedeem" disabled>Redeem (16)</button>
         <button class="btn-ghost" id="btnMortgageQuote">Quote min ransom</button>
+        <button class="btn-ghost" id="btnCalcLoan">Calc loan from HACD</button>
         <button class="btn-ghost" id="btnNewLendId">New lending ID</button>
       </div>
-      <div class="meta" id="mortgageMeta" style="margin-top:0.75rem">Select Available HACD for open; mortgaged HACD for redeem quote.</div>
+      <div class="meta" id="mortgageMeta" style="margin-top:0.75rem">1) Fill testnet + Load portfolio · 2) Select Available HACD · 3) Calc loan · 4) Open mortgage</div>
+      <div id="mortgageContracts" class="meta" style="margin-top:0.5rem"></div>
     </section>
 
     <section class="panel">
@@ -248,7 +250,7 @@
     }
 
     const $ = (id) => document.getElementById(id);
-    const state = { diamonds: [], height: 0, selected: new Set(), wasm: null, hip25Dev: true };
+    const state = { diamonds: [], mortgageContracts: [], height: 0, selected: new Set(), wasm: null, hip25Dev: true };
     let loadRetryTimer = null;
 
     function schedulePortfolioRetry() {
@@ -342,14 +344,19 @@
         row.className = "diamond-row" + (state.selected.has(d.literal) ? " selected" : "");
         const canStake = d.status === "Available";
         const canUnstake = d.status === "Staked" && state.height >= d.min_unstake_height;
-        const isMortgaged = d.status === "Mortgaged" || d.status === "unknown" && d.mortgaged;
+        const isMortgaged = d.status === "Mortgaged";
         const cb = document.createElement("input");
         cb.type = "checkbox";
         cb.checked = state.selected.has(d.literal);
         cb.disabled = !canStake && !canUnstake && !isMortgaged;
         cb.onchange = () => {
-          if (cb.checked) state.selected.add(d.literal);
-          else state.selected.delete(d.literal);
+          if (cb.checked) {
+            state.selected.add(d.literal);
+            if (isMortgaged && d.lending_id) {
+              $("lendId").value = d.lending_id;
+              $("btnMortgageQuote").click();
+            }
+          } else state.selected.delete(d.literal);
           updateActionButtons();
           row.classList.toggle("selected", cb.checked);
         };
@@ -359,7 +366,9 @@
         lit.textContent = d.literal;
         const meta = document.createElement("div");
         meta.className = "meta";
-        meta.textContent = `reward ${d.accrued_reward || "0"} · min unstake h ${d.min_unstake_height ?? "—"}`;
+        let metaTxt = `reward ${d.accrued_reward || "0"} · min unstake h ${d.min_unstake_height ?? "—"}`;
+        if (d.lending_id) metaTxt += ` · mortgage ${d.lending_id.slice(0, 8)}…`;
+        meta.textContent = metaTxt;
         info.append(lit, meta);
         const badge = document.createElement("span");
         badge.className = `badge badge-${d.status}`;
@@ -381,6 +390,53 @@
       $("btnUnstake").disabled = !wasmOk || !canUnstake;
       $("btnMortgageOpen").disabled = !wasmOk || !canMortgageOpen;
       $("btnMortgageRedeem").disabled = !wasmOk || !$("lendId").value.trim();
+    }
+
+    function renderMortgageContracts() {
+      const el = $("mortgageContracts");
+      const list = state.mortgageContracts || [];
+      if (!list.length) {
+        el.textContent = "No active mortgage contracts for this address.";
+        return;
+      }
+      el.innerHTML = list.map((c) => {
+        const id = c.lending_id || "";
+        const dias = (c.diamonds || []).join(", ");
+        return `<div style="margin:0.35rem 0;padding:0.5rem;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
+          <strong class="literal">${id.slice(0, 12)}…</strong> · loan ${c.loan_principal || "—"} · phase ${c.redeem_phase || "—"} · ransom ${c.min_ransom || "—"}<br/>
+          HACD: ${dias || "—"}
+          <button type="button" class="btn-ghost" style="margin-top:0.35rem;padding:0.25rem 0.5rem;font-size:0.75rem" data-lend="${id}" data-ransom="${c.min_ransom || ""}">Use for redeem</button>
+        </div>`;
+      }).join("");
+      el.querySelectorAll("button[data-lend]").forEach((btn) => {
+        btn.onclick = () => {
+          $("lendId").value = btn.getAttribute("data-lend") || "";
+          $("ransomAmount").value = btn.getAttribute("data-ransom") || "";
+          updateActionButtons();
+          log(`Selected contract ${$("lendId").value.slice(0, 12)}… for redeem`);
+        };
+      });
+    }
+
+    async function loadMortgagePortfolio(addr) {
+      try {
+        const p = await apiGet("query/mortgage/portfolio", { address: addr });
+        state.mortgageContracts = p.contracts || [];
+        renderMortgageContracts();
+        return state.mortgageContracts;
+      } catch (e) {
+        state.mortgageContracts = [];
+        $("mortgageContracts").textContent = `Mortgage portfolio: ${e.message}`;
+        return [];
+      }
+    }
+
+    async function calcLoanFromSelection() {
+      const sel = [...state.selected].filter((n) => state.diamonds.find((d) => d.literal === n)?.status === "Available");
+      if (!sel.length) throw new Error("Select Available HACD first");
+      const p = await apiGet("query/mortgage/principal", { diamonds: sel.join(",") });
+      $("loanAmount").value = p.loan || "";
+      log(`Loan principal for ${sel.join(",")}: ${p.loan}`, "ok");
     }
 
     async function loadPortfolio(opts = {}) {
@@ -422,7 +478,12 @@
       $("sCooldown").textContent = summary.cooldown_count ?? 0;
       $("sAccrued").textContent = summary.total_accrued_reward || "0";
 
-      const names = splitDiamonds(entry.diamonds || "");
+      const contracts = await loadMortgagePortfolio(addr);
+      const mortgagedMap = {};
+      for (const c of contracts) {
+        for (const d of c.diamonds || []) mortgagedMap[d] = c.lending_id;
+      }
+      const names = [...new Set([...splitDiamonds(entry.diamonds || ""), ...Object.keys(mortgagedMap)])];
       if (!names.length && state.height < 1) {
         log("Waiting for block 1 (testnet seed loads with first block)…");
         schedulePortfolioRetry();
@@ -433,7 +494,7 @@
         state.diamonds = [];
         state.selected.clear();
         renderDiamonds();
-        log(`No HACD on ${addr} — use Fill testnet (1Do17Buq...)`, "err");
+        log(`No HACD on ${addr} — click "Fill HIP-25 testnet seed" then Load portfolio`, "err");
         return;
       }
       state.selected.clear();
@@ -442,6 +503,7 @@
         status: "Loading",
         accrued_reward: "0",
         min_unstake_height: 0,
+        lending_id: mortgagedMap[literal] || "",
       }));
       renderDiamonds();
       await Promise.all(
@@ -453,9 +515,16 @@
               status: st.status || "unknown",
               accrued_reward: st.accrued_reward || "0",
               min_unstake_height: st.min_unstake_height || 0,
+              lending_id: mortgagedMap[literal] || "",
             };
           } catch (e) {
-            state.diamonds[idx] = { literal, status: "unknown", accrued_reward: "0", min_unstake_height: 0 };
+            state.diamonds[idx] = {
+              literal,
+              status: mortgagedMap[literal] ? "Mortgaged" : "unknown",
+              accrued_reward: "0",
+              min_unstake_height: 0,
+              lending_id: mortgagedMap[literal] || "",
+            };
           }
         })
       );
@@ -567,6 +636,8 @@
       updateActionButtons();
     };
 
+    $("btnCalcLoan").onclick = () => calcLoanFromSelection().catch((e) => log(e.message, "err"));
+
     $("btnMortgageQuote").onclick = async () => {
       const id = $("lendId").value.trim();
       if (!id) return log("Lending ID required", "err");
@@ -574,7 +645,7 @@
         const q = await apiGet("query/mortgage/contract", {
           id,
           redeemer: $("address").value.trim(),
-          height: String(state.height),
+          height: state.height ? String(state.height) : "0",
         });
         $("ransomAmount").value = q.min_ransom || "";
         $("mortgageMeta").textContent = `Phase: ${q.redeem_phase || "—"} · min ransom: ${q.min_ransom || "—"}`;
@@ -626,8 +697,11 @@
           $("networkTag").textContent = "HIP-25 testnet";
           if (!$("address").value.trim()) {
             $("address").value = TESTNET.address;
-            setTimeout(() => loadPortfolio().catch((e) => log(e.message, "err")), 500);
+            $("fee").value = TESTNET.fee;
+            $("chainId").value = "1";
           }
+          if (!$("lendId").value.trim()) $("lendId").value = randomLendIdHex();
+          setTimeout(() => loadPortfolio().catch((e) => log(e.message, "err")), 800);
         } else {
           $("btnTestnet").style.display = "none";
           $("chainId").value = MAINNET_CHAIN_ID;
