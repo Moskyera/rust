@@ -182,6 +182,7 @@ macro_rules! defineQueryObject{
     ( $name: ident, $( $item: ident, $ty: ty, $dv: expr,)+ ) => (
 
         #[derive(serde::Deserialize)]
+        #[serde(default)]
         struct $name {
             $(
                 $item: $ty,

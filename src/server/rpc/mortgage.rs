@@ -25,6 +25,7 @@ async fn mortgage_global(State(ctx): State<ApiCtx>, _q: Query<QMortgageGlobal>) 
         "blocks_per_year", MORTGAGE_BLOCKS_PER_YEAR,
         "auction_floor_bps", MORTGAGE_AUCTION_FLOOR_BPS,
         "economics_version", "v2.1",
+        "owner_index_max", MORTGAGE_OWNER_INDEX_MAX as u64,
     };
     api_data(data)
 }
@@ -147,9 +148,13 @@ async fn mortgage_portfolio(State(ctx): State<ApiCtx>, q: Query<QMortgagePortfol
             "min_ransom": min_ransom,
         }));
     }
+    let indexed = index.iter_ids().len() as u64;
     let data = jsondata!{
         "address", adr.readable(),
         "active_count", contracts.len() as u64,
+        "indexed_count", indexed,
+        "owner_index_max", MORTGAGE_OWNER_INDEX_MAX as u64,
+        "owner_index_full", indexed >= MORTGAGE_OWNER_INDEX_MAX as u64,
         "contracts", contracts,
         "economics_version", "v2.1",
     };
@@ -182,4 +187,53 @@ async fn mortgage_principal(State(ctx): State<ApiCtx>, q: Query<QMortgagePrincip
         "hacd_count", list.count().uint(),
     };
     api_data(data)
+}
+
+#[cfg(test)]
+mod mortgage_query_tests {
+    use super::*;
+    use crate::core::state::{BlockStore, ChainState};
+    use crate::mint::state::MintStoreDisk;
+    use tempfile::TempDir;
+
+    fn seed_smelt(block_store: &BlockStore, name: &str, burn_mei: u16) {
+        let dian = DiamondName::cons(name.as_bytes().try_into().unwrap());
+        let smelt = DiamondSmelt {
+            diamond: dian.clone(),
+            number: DiamondNumber::from(1),
+            born_height: BlockHeight::from(1),
+            born_hash: Hash::default(),
+            prev_hash: Hash::default(),
+            miner_address: Address::default(),
+            bid_fee: Amount::default(),
+            nonce: Fixed8::default(),
+            average_bid_burn: Uint2::from(burn_mei),
+            life_gene: Hash::default(),
+        };
+        MintStoreDisk::wrap(block_store).put_diamond_smelt(&dian, &smelt);
+    }
+
+    #[test]
+    fn mortgage_principal_quote_matches_two_hacd_bid_burn() {
+        let dir = TempDir::new().unwrap();
+        let state = ChainState::open(dir.path());
+        let block_store = BlockStore::from_shared(state.copy_ldb());
+        seed_smelt(&block_store, "WTYUIA", 100);
+        seed_smelt(&block_store, "HXVMEK", 100);
+        let mint_store = MintStoreDisk::wrap(&block_store);
+        let list =
+            DiamondNameListMax200::from_readable("WTYUIA,HXVMEK").expect("diamond list");
+        let principal = mortgage_compute_principal(&mint_store, &list).expect("principal");
+        let burn = mortgage_origination_burn(&principal).expect("origination");
+        assert_eq!(principal.to_fin_string(), "2:250");
+        assert_eq!(burn.to_fin_string(), "2:248");
+        assert_eq!(list.count().uint(), 2);
+    }
+
+    #[test]
+    fn mortgage_principal_query_deserializes_diamonds_only() {
+        let q: QMortgagePrincipal =
+            serde_urlencoded::from_str("diamonds=WTYUIA").expect("diamonds query");
+        assert_eq!(q.diamonds, "WTYUIA");
+    }
 }

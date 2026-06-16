@@ -48,6 +48,7 @@ Open: **http://127.0.0.1:8083/hip25/wallet**
 1. Click **Fill HIP-25 testnet seed**
 2. **Load portfolio** — five HACD with badges (`Available` / `Staked` / `Cooldown`)
 3. Select diamonds → **Stake selected** or **Unstake selected**
+4. **HIP-2 mortgage** — select **Available** HACD → loan auto-fills → **Open mortgage** (action 15); redeem with **Redeem HACD** (action 16)
 
 Tx modes:
 
@@ -68,6 +69,8 @@ Exported functions:
 
 - `hacd_stake(chain_id, password, "WTYUIA,HXVMEK", fee, timestamp)` → signed tx JSON
 - `hacd_unstake(chain_id, password, diamonds, fee, timestamp)` → signed tx JSON
+- `hacd_mortgage_open(chain_id, password, lending_id_hex, diamonds, loan, borrow_periods, fee, timestamp)` → action 15
+- `hacd_mortgage_redeem(chain_id, password, lending_id_hex, ransom, fee, timestamp)` → action 16
 
 Submit `tx_body` hex via `POST /submit/transaction`.
 
@@ -91,6 +94,21 @@ From repo root:
 | `GET /query/staking/events?from=0&limit=20` | Stake/unstake events |
 
 Actions: **34** stake, **35** unstake.
+
+## Mortgage RPC (HIP-2 v2.1)
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /query/mortgage/global` | Outstanding IOU, APR, `owner_index_max` (64) |
+| `GET /query/mortgage/portfolio?address=…` | Active contracts; `indexed_count`, `owner_index_full` |
+| `GET /query/mortgage/principal?diamonds=WTYUIA,HXVMEK` | Loan + origination burn quote |
+| `GET /query/mortgage/contract?id=…&redeemer=…` | Min ransom / redemption phase |
+
+Actions: **15** mortgage open, **16** mortgage redeem.
+
+**64-contract limit:** each address may have at most **64** active mortgage contracts indexed on-chain (`MORTGAGE_OWNER_INDEX_MAX`). The wallet and `mortgage/portfolio` RPC surface `owner_index_full` when the limit is reached; opening another contract fails with `mortgage owner contract index full`.
+
+**Testnet economics example:** 1 HACD → loan `1:250`, origination burn ~`1:249` (1%); 2 HACD → loan `2:250`, burn ~`2:248`. Portfolio address and signing password must match.
 
 ## Consensus parameters (v1)
 

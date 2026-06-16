@@ -1,5 +1,11 @@
 
 const HIP25_WALLET_HTML: &str = include_str!("../../../wallet/hip25/index.html");
+const HIP25_WALLET_CORE_JS: &str = include_str!("../../../wallet/hip25/js/core.js");
+const HIP25_WALLET_API_JS: &str = include_str!("../../../wallet/hip25/js/api.js");
+const HIP25_WALLET_SIGNING_JS: &str = include_str!("../../../wallet/hip25/js/signing.js");
+const HIP25_WALLET_PORTFOLIO_JS: &str = include_str!("../../../wallet/hip25/js/portfolio.js");
+const HIP25_WALLET_MORTGAGE_JS: &str = include_str!("../../../wallet/hip25/js/mortgage.js");
+const HIP25_WALLET_APP_JS: &str = include_str!("../../../wallet/hip25/js/app.js");
 
 fn hip25_pkg_dir() -> Option<std::path::PathBuf> {
     let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
@@ -64,11 +70,45 @@ fn serve_pkg_file(name: &str, content_type: &'static str) -> Response {
         .into_response()
 }
 
+fn hip25_wallet_js(content: &'static str) -> impl IntoResponse {
+    (
+        [
+            (header::CONTENT_TYPE, "application/javascript; charset=utf-8"),
+            (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
+        ],
+        content,
+    )
+}
+
 async fn hip25_wallet_page() -> impl IntoResponse {
     (
         [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
         HIP25_WALLET_HTML,
     )
+}
+
+async fn hip25_wallet_core_js() -> impl IntoResponse {
+    hip25_wallet_js(HIP25_WALLET_CORE_JS)
+}
+
+async fn hip25_wallet_api_js() -> impl IntoResponse {
+    hip25_wallet_js(HIP25_WALLET_API_JS)
+}
+
+async fn hip25_wallet_signing_js() -> impl IntoResponse {
+    hip25_wallet_js(HIP25_WALLET_SIGNING_JS)
+}
+
+async fn hip25_wallet_portfolio_js() -> impl IntoResponse {
+    hip25_wallet_js(HIP25_WALLET_PORTFOLIO_JS)
+}
+
+async fn hip25_wallet_mortgage_js() -> impl IntoResponse {
+    hip25_wallet_js(HIP25_WALLET_MORTGAGE_JS)
+}
+
+async fn hip25_wallet_app_js() -> impl IntoResponse {
+    hip25_wallet_js(HIP25_WALLET_APP_JS)
 }
 
 async fn hip25_sdk_js() -> impl IntoResponse {

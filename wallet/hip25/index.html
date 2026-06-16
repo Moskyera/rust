@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>HIP-25 Staking · HIP-2 Mortgage Wallet</title>
+  <title>HIP-25 Staking Â· HIP-2 Mortgage Wallet</title>
   <style>
     :root {
       --bg: #0f1419;
@@ -167,7 +167,7 @@
 </head>
 <body>
   <header>
-    <h1>HIP-25 Staking · HIP-2 Mortgage</h1>
+    <h1>HIP-25 Staking Â· HIP-2 Mortgage</h1>
     <span class="tag" id="networkTag">Wallet MVP</span>
   </header>
   <main>
@@ -191,17 +191,17 @@
         </div>
         <div>
           <label for="prikey">Signing password (local WASM)</label>
-          <span class="field-hint">Testnet seed password: <span class="field-example">hip25test</span>. Never sent to RPC — only derives the key that signs txs.</span>
+          <span class="field-hint">Testnet seed password: <span class="field-example">hip25test</span>. Never sent to RPC â€” only derives the key that signs txs.</span>
           <input id="prikey" type="password" placeholder="hip25test" autocomplete="off" />
         </div>
         <div>
           <label for="signAddress">Signing address (from password)</label>
           <span class="field-hint">Must match portfolio address and hold enough HAC for origination burn + tx fee.</span>
-          <input id="signAddress" readonly placeholder="Enter password to resolve…" />
+          <input id="signAddress" readonly placeholder="Enter password to resolveâ€¦" />
         </div>
         <div>
           <label for="chainId">Chain ID</label>
-          <span class="field-hint">Testnet = <span class="field-example">1</span> · Mainnet = <span class="field-example">0</span>. Synced automatically from the node.</span>
+          <span class="field-hint">Testnet = <span class="field-example">1</span> Â· Mainnet = <span class="field-example">0</span>. Synced automatically from the node.</span>
           <input id="chainId" value="1" />
         </div>
       </div>
@@ -211,20 +211,20 @@
         <button class="btn-ghost" id="btnRefresh">Refresh</button>
       </div>
       <div class="meta" id="addressWarn" style="margin-top:0.5rem"></div>
-      <div class="meta" id="sdkStatus" style="margin-top:0.75rem">WASM SDK: checking…</div>
+      <div class="meta" id="sdkStatus" style="margin-top:0.75rem">WASM SDK: checkingâ€¦</div>
     </section>
 
     <section class="panel">
       <h2>Account summary</h2>
       <div class="stats" id="stats">
-        <div class="stat"><div class="val" id="sHac">—</div><div class="lbl">HAC balance</div></div>
-        <div class="stat"><div class="val" id="sStaked">—</div><div class="lbl">Staked HACD</div></div>
-        <div class="stat"><div class="val" id="sCooldown">—</div><div class="lbl">HACD in cooldown</div></div>
-        <div class="stat"><div class="val" id="sAccrued">—</div><div class="lbl">Accrued rewards</div></div>
-        <div class="stat"><div class="val" id="sHeight">—</div><div class="lbl">Chain height</div></div>
-        <div class="stat"><div class="val" id="sPool">—</div><div class="lbl">Staking pool (zhu)</div></div>
-        <div class="stat"><div class="val" id="sMortgageIoU">—</div><div class="lbl">Outstanding mortgage IOU (zhu)</div></div>
-        <div class="stat"><div class="val" id="sMortgageApr">—</div><div class="lbl">Mortgage APR</div></div>
+        <div class="stat"><div class="val" id="sHac">â€”</div><div class="lbl">HAC balance</div></div>
+        <div class="stat"><div class="val" id="sStaked">â€”</div><div class="lbl">Staked HACD</div></div>
+        <div class="stat"><div class="val" id="sCooldown">â€”</div><div class="lbl">HACD in cooldown</div></div>
+        <div class="stat"><div class="val" id="sAccrued">â€”</div><div class="lbl">Accrued rewards</div></div>
+        <div class="stat"><div class="val" id="sHeight">â€”</div><div class="lbl">Chain height</div></div>
+        <div class="stat"><div class="val" id="sPool">â€”</div><div class="lbl">Staking pool (zhu)</div></div>
+        <div class="stat"><div class="val" id="sMortgageIoU">â€”</div><div class="lbl">Outstanding mortgage IOU (zhu)</div></div>
+        <div class="stat"><div class="val" id="sMortgageApr">â€”</div><div class="lbl">Mortgage APR</div></div>
       </div>
     </section>
 
@@ -232,10 +232,10 @@
       <h2>HIP-2 HACD mortgage</h2>
       <div class="steps" style="margin-bottom:1rem">
         <strong>Steps:</strong>
-        1) Fill testnet seed + load portfolio ·
-        2) Select HACD with status <strong>Available</strong> ·
-        3) Loan auto-fills when you select HACD (<span class="field-example">1 HACD = 1:250</span>, <span class="field-example">2 HACD = 2:250</span>) ·
-        4) <strong>Open mortgage</strong> (action 15) — needs HAC for 1% origination burn + tx fee
+        1) Fill testnet seed + load portfolio Â·
+        2) Select HACD with status <strong>Available</strong> Â·
+        3) Loan auto-fills when you select HACD (<span class="field-example">1 HACD = 1:250</span>, <span class="field-example">2 HACD = 2:250</span>) Â·
+        4) <strong>Open mortgage</strong> (action 15) â€” needs HAC for 1% origination burn + tx fee
       </div>
       <div class="grid-2">
         <div>
@@ -245,7 +245,7 @@
         </div>
         <div>
           <label for="borrowPeriod">Borrow period T (periods)</label>
-          <span class="field-hint">How many loan periods (1–20). On testnet each period = 10 blocks.</span>
+          <span class="field-hint">How many loan periods (1â€“20). On testnet each period = 10 blocks.</span>
           <input id="borrowPeriod" type="number" min="1" max="20" value="5" title="Number of borrow periods" />
         </div>
         <div>
@@ -261,12 +261,13 @@
         </div>
       </div>
       <div class="btn-row">
-        <button class="btn-primary" id="btnMortgageOpen" disabled title="Action 15 — MortgageOpen">Open mortgage</button>
-        <button class="btn-unstake" id="btnMortgageRedeem" disabled title="Action 16 — MortgageRedeem">Redeem HACD</button>
+        <button class="btn-primary" id="btnMortgageOpen" disabled title="Action 15 â€” MortgageOpen">Open mortgage</button>
+        <button class="btn-unstake" id="btnMortgageRedeem" disabled title="Action 16 â€” MortgageRedeem">Redeem HACD</button>
         <button class="btn-ghost" id="btnMortgageQuote">Quote min ransom</button>
         <button class="btn-ghost" id="btnCalcLoan">Calculate loan</button>
         <button class="btn-ghost" id="btnNewLendId">New lending ID</button>
       </div>
+      <span class="field-hint" id="mortgageIndexHint" style="display:block;margin-top:0.5rem"></span>
       <div class="meta" id="mortgageMeta" style="margin-top:0.75rem">Redemption phase and minimum ransom appear here after a quote.</div>
       <div id="mortgageContracts" class="meta" style="margin-top:0.5rem"></div>
     </section>
@@ -274,7 +275,7 @@
     <section class="panel">
       <h2>Your HACD</h2>
       <p class="field-hint" style="margin-bottom:0.75rem">
-        <strong>Available</strong> = free to stake or mortgage · <strong>Staked</strong> = earning rewards · <strong>Cooldown</strong> = unstake waiting period · <strong>Mortgaged</strong> = locked in a loan
+        <strong>Available</strong> = free to stake or mortgage Â· <strong>Staked</strong> = earning rewards Â· <strong>Cooldown</strong> = unstake waiting period Â· <strong>Mortgaged</strong> = locked in a loan
       </p>
       <div class="btn-row" style="margin-top:0;margin-bottom:1rem">
         <button class="btn-stake" id="btnStake" disabled>Stake selected</button>
@@ -292,619 +293,11 @@
       <div id="log"></div>
     </section>
   </main>
-  <script>
-    const MAINNET_CHAIN_ID = "0";
-    const TESTNET = {
-      address: "1Do17BuqMj5N4EZRuquXtoCCHFZpQoHyc2",
-      password: "hip25test",
-      fee: "0:247",
-    };
-
-    function txTimestamp() {
-      return Math.floor(Date.now() / 1000);
-    }
-
-    const $ = (id) => document.getElementById(id);
-    const state = { diamonds: [], mortgageContracts: [], height: 0, selected: new Set(), wasm: null, hip25Dev: true, signAddress: "" };
-    let loadRetryTimer = null;
-    let loanRefreshTimer = null;
-
-    function schedulePortfolioRetry() {
-      if (loadRetryTimer) return;
-      loadRetryTimer = setTimeout(() => {
-        loadRetryTimer = null;
-        loadPortfolio({ retry: true }).catch((e) => log(e.message, "err"));
-      }, 2000);
-    }
-
-    function clearPortfolioRetry() {
-      if (!loadRetryTimer) return;
-      clearTimeout(loadRetryTimer);
-      loadRetryTimer = null;
-    }
-
-    function sdkOrigin() {
-      return window.location.origin;
-    }
-
-    function apiBase() {
-      let b = $("rpc").value.trim().replace(/\/$/, "");
-      if (!b) b = sdkOrigin();
-      return b;
-    }
-
-    function warnRpcOriginMismatch() {
-      const api = apiBase();
-      const sdk = sdkOrigin();
-      if (api !== sdk) {
-        log(`RPC URL (${api}) differs from wallet origin (${sdk}); WASM SDK always loads from wallet origin`, "err");
-      }
-    }
-
-    function log(msg, cls = "") {
-      const el = $("log");
-      const line = document.createElement("div");
-      if (cls) line.className = cls;
-      line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-      el.prepend(line);
-    }
-
-    function parseAccountJson(raw) {
-      if (!raw || raw.startsWith("[ERROR]")) throw new Error(raw || "account error");
-      const trimmed = raw.trim();
-      if (!trimmed.startsWith("{")) throw new Error("invalid account JSON");
-      return JSON.parse(trimmed);
-    }
-
-    function explainSubmitError(msg) {
-      if (msg.includes("loan amount must be")) {
-        return `${msg} — re-select HACD or click Calculate loan (amount scales per HACD: 1:250 each on testnet)`;
-      }
-      if (msg.includes("do hac_sub error") && msg.includes("not enough")) {
-        return `${msg} — password must match portfolio address (testnet: hip25test → ${TESTNET.address}). Load portfolio for that address.`;
-      }
-      return msg;
-    }
-
-    async function resolveSigningAddress() {
-      const pass = $("prikey").value.trim();
-      const el = $("signAddress");
-      const warn = $("addressWarn");
-      if (!pass) {
-        state.signAddress = "";
-        el.value = "";
-        warn.textContent = "";
-        return "";
-      }
-      if (!state.wasm?.create_account_by) {
-        el.value = "(rebuild WASM: scripts/build_wallet_sdk.ps1)";
-        return "";
-      }
-      try {
-        const acc = parseAccountJson(state.wasm.create_account_by(pass));
-        state.signAddress = acc.address || "";
-        el.value = state.signAddress;
-        updateAddressMismatchWarning();
-        return state.signAddress;
-      } catch (e) {
-        state.signAddress = "";
-        el.value = "";
-        warn.textContent = e.message;
-        warn.className = "meta err";
-        return "";
-      }
-    }
-
-    function updateAddressMismatchWarning() {
-      const warn = $("addressWarn");
-      const portfolio = $("address").value.trim();
-      const signer = state.signAddress;
-      if (!portfolio || !signer) {
-        warn.textContent = "";
-        return;
-      }
-      if (portfolio !== signer) {
-        warn.textContent = `Mismatch: portfolio is ${portfolio} but password signs as ${signer}. Txs will fail — use password hip25test with testnet seed address.`;
-        warn.className = "meta err";
-        return;
-      }
-      warn.textContent = "Portfolio address matches signing address.";
-      warn.className = "meta ok";
-    }
-
-    function selectedAvailableDiamonds() {
-      const byName = Object.fromEntries(state.diamonds.map((d) => [d.literal, d]));
-      return [...state.selected].filter((n) => byName[n]?.status === "Available");
-    }
-
-    function scheduleLoanRefresh() {
-      if (loanRefreshTimer) clearTimeout(loanRefreshTimer);
-      loanRefreshTimer = setTimeout(() => {
-        loanRefreshTimer = null;
-        refreshLoanForSelection().catch(() => {});
-      }, 200);
-    }
-
-    async function refreshLoanForSelection(opts = {}) {
-      const sel = selectedAvailableDiamonds();
-      const hint = $("mortgageCostHint");
-      if (!sel.length) {
-        hint.textContent = "";
-        return;
-      }
-      const p = await apiGet("query/mortgage/principal", { diamonds: sel.join(",") });
-      $("loanAmount").value = p.loan || "";
-      const fee = $("fee").value.trim() || "0";
-      hint.textContent = `${p.hacd_count || sel.length} HACD → loan ${p.loan} · origination burn (1%) ${p.origination_burn || "—"} · tx fee ${fee}`;
-      if (!opts.quiet) log(`Loan updated: ${p.loan} for ${sel.join(",")}`, "ok");
-    }
-
-    async function apiGet(path, params = {}) {
-      const qs = new URLSearchParams(params).toString();
-      const url = `${apiBase()}/${path}${qs ? "?" + qs : ""}`;
-      let r;
-      try {
-        r = await fetch(url);
-      } catch (e) {
-        throw new Error(`RPC unreachable at ${apiBase()} — run START_WALLET.bat and keep HIP25-FULLNODE open`);
-      }
-      const text = await r.text();
-      let j;
-      try {
-        j = JSON.parse(text);
-      } catch {
-        throw new Error(text.trim() || `RPC error ${r.status}`);
-      }
-      if (j.ret !== 0) throw new Error(j.err || JSON.stringify(j));
-      return j;
-    }
-
-    async function apiPost(path, body, params = {}) {
-      const qs = new URLSearchParams(params).toString();
-      const url = `${apiBase()}/${path}${qs ? "?" + qs : ""}`;
-      const bytes = body instanceof Uint8Array ? body : new TextEncoder().encode(body);
-      const r = await fetch(url, { method: "POST", body: bytes });
-      const text = await r.text();
-      let j;
-      try {
-        j = JSON.parse(text);
-      } catch {
-        throw new Error(text.trim() || `RPC error ${r.status}`);
-      }
-      if (j.ret !== 0) throw new Error(explainSubmitError(j.err || JSON.stringify(j)));
-      return j;
-    }
-
-    function hexToBytes(hex) {
-      const out = new Uint8Array(hex.length / 2);
-      for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.substr(i * 2, 2), 16);
-      return out;
-    }
-
-    function splitDiamonds(str) {
-      if (!str) return [];
-      const w = 6;
-      const s = str.replace(/\s/g, "");
-      const out = [];
-      for (let i = 0; i < s.length; i += w) out.push(s.slice(i, i + w));
-      return out.filter((x) => x.length === w);
-    }
-
-    function renderDiamonds() {
-      const box = $("diamonds");
-      box.innerHTML = "";
-      if (!state.diamonds.length) {
-        box.innerHTML = '<div class="empty">No HACD found for this address.</div>';
-        return;
-      }
-      for (const d of state.diamonds) {
-        const row = document.createElement("div");
-        row.className = "diamond-row" + (state.selected.has(d.literal) ? " selected" : "");
-        const canStake = d.status === "Available";
-        const canUnstake = d.status === "Staked" && state.height >= d.min_unstake_height;
-        const isMortgaged = d.status === "Mortgaged";
-        const cb = document.createElement("input");
-        cb.type = "checkbox";
-        cb.checked = state.selected.has(d.literal);
-        cb.disabled = !canStake && !canUnstake && !isMortgaged;
-        cb.onchange = () => {
-          if (cb.checked) {
-            state.selected.add(d.literal);
-            if (isMortgaged && d.lending_id) {
-              $("lendId").value = d.lending_id;
-              $("btnMortgageQuote").click();
-            }
-          } else state.selected.delete(d.literal);
-          updateActionButtons();
-          row.classList.toggle("selected", cb.checked);
-          scheduleLoanRefresh();
-        };
-        const info = document.createElement("div");
-        const lit = document.createElement("div");
-        lit.className = "literal";
-        lit.textContent = d.literal;
-        const meta = document.createElement("div");
-        meta.className = "meta";
-        let metaTxt = `reward ${d.accrued_reward || "0"} · min unstake block ${d.min_unstake_height ?? "—"}`;
-        if (d.lending_id) metaTxt += ` · mortgage ${d.lending_id.slice(0, 8)}…`;
-        meta.textContent = metaTxt;
-        info.append(lit, meta);
-        const badge = document.createElement("span");
-        badge.className = `badge badge-${d.status}`;
-        badge.textContent = d.status;
-        row.append(cb, info, badge, document.createElement("span"));
-        box.appendChild(row);
-      }
-      updateActionButtons();
-    }
-
-    function updateActionButtons() {
-      const sel = [...state.selected];
-      const byName = Object.fromEntries(state.diamonds.map((d) => [d.literal, d]));
-      const canStake = sel.some((n) => byName[n]?.status === "Available");
-      const canUnstake = sel.some((n) => byName[n]?.status === "Staked" && state.height >= (byName[n].min_unstake_height || 0));
-      const canMortgageOpen = sel.some((n) => byName[n]?.status === "Available");
-      const wasmOk = !!state.wasm;
-      $("btnStake").disabled = !wasmOk || !canStake;
-      $("btnUnstake").disabled = !wasmOk || !canUnstake;
-      $("btnMortgageOpen").disabled = !wasmOk || !canMortgageOpen;
-      $("btnMortgageRedeem").disabled = !wasmOk || !$("lendId").value.trim();
-    }
-
-    function renderMortgageContracts() {
-      const el = $("mortgageContracts");
-      const list = state.mortgageContracts || [];
-      if (!list.length) {
-        el.textContent = "No active mortgage contracts for this address.";
-        return;
-      }
-      el.innerHTML = list.map((c) => {
-        const id = c.lending_id || "";
-        const dias = (c.diamonds || []).join(", ");
-        return `<div style="margin:0.35rem 0;padding:0.5rem;background:var(--bg);border-radius:6px;border:1px solid var(--border)">
-          <strong class="literal">${id.slice(0, 12)}…</strong> · loan ${c.loan_principal || "—"} · phase ${c.redeem_phase || "—"} · ransom ${c.min_ransom || "—"}<br/>
-          HACD: ${dias || "—"}
-          <button type="button" class="btn-ghost" style="margin-top:0.35rem;padding:0.25rem 0.5rem;font-size:0.75rem" data-lend="${id}" data-ransom="${c.min_ransom || ""}">Use for redeem</button>
-        </div>`;
-      }).join("");
-      el.querySelectorAll("button[data-lend]").forEach((btn) => {
-        btn.onclick = () => {
-          $("lendId").value = btn.getAttribute("data-lend") || "";
-          $("ransomAmount").value = btn.getAttribute("data-ransom") || "";
-          updateActionButtons();
-          log(`Selected contract ${$("lendId").value.slice(0, 12)}… for redeem`);
-        };
-      });
-    }
-
-    async function loadMortgagePortfolio(addr) {
-      try {
-        const p = await apiGet("query/mortgage/portfolio", { address: addr });
-        state.mortgageContracts = p.contracts || [];
-        renderMortgageContracts();
-        return state.mortgageContracts;
-      } catch (e) {
-        state.mortgageContracts = [];
-        $("mortgageContracts").textContent = `Mortgage portfolio: ${e.message}`;
-        return [];
-      }
-    }
-
-    async function calcLoanFromSelection() {
-      const sel = selectedAvailableDiamonds();
-      if (!sel.length) throw new Error("Select Available HACD first");
-      await refreshLoanForSelection();
-    }
-
-    async function loadPortfolio(opts = {}) {
-      const addr = $("address").value.trim();
-      if (!addr) throw new Error("Address required");
-      if (!opts.retry) log("Loading portfolio…");
-      const latest = await apiGet("query/latest");
-      state.height = latest.height;
-      $("sHeight").textContent = latest.height;
-      state.hip25Dev = !!latest.hip25_dev;
-      if (latest.chain_id !== undefined) {
-        const nodeChain = String(latest.chain_id);
-        const cur = $("chainId").value.trim();
-        if (!cur || cur !== nodeChain) {
-          $("chainId").value = nodeChain;
-          if (cur && cur !== nodeChain) log(`Chain ID synced to node (${nodeChain})`, "err");
-        }
-        $("chainId").readOnly = !latest.hip25_dev;
-        $("networkTag").textContent = latest.hip25_dev ? "HIP-25 testnet" : `Mainnet chain ${MAINNET_CHAIN_ID}`;
-      }
-
-      const global = await apiGet("query/staking/global");
-      $("sPool").textContent = global.reward_pool_pending_zhu ?? "—";
-      try {
-        const mg = await apiGet("query/mortgage/global");
-        $("sMortgageIoU").textContent = mg.outstanding_ioo_zhu ?? "—";
-        $("sMortgageApr").textContent = mg.apr_bps ? `${(mg.apr_bps / 100).toFixed(1)}%` : "—";
-      } catch (_) {
-        $("sMortgageIoU").textContent = "—";
-        $("sMortgageApr").textContent = "—";
-      }
-
-      const bal = await apiGet("query/balance", { address: addr, diamonds: "true" });
-      const entry = bal.list?.[0] || {};
-      $("sHac").textContent = entry.hacash || "0";
-
-      const summary = await apiGet("query/staking/summary", { address: addr, offset: "0", limit: "200" });
-      $("sStaked").textContent = summary.staked_count ?? 0;
-      $("sCooldown").textContent = summary.cooldown_count ?? 0;
-      $("sAccrued").textContent = summary.total_accrued_reward || "0";
-
-      const contracts = await loadMortgagePortfolio(addr);
-      const mortgagedMap = {};
-      for (const c of contracts) {
-        for (const d of c.diamonds || []) mortgagedMap[d] = c.lending_id;
-      }
-      const names = [...new Set([...splitDiamonds(entry.diamonds || ""), ...Object.keys(mortgagedMap)])];
-      if (!names.length && state.height < 1) {
-        log("Waiting for block 1 (testnet seed loads with first block)…");
-        schedulePortfolioRetry();
-        return;
-      }
-      clearPortfolioRetry();
-      if (!names.length) {
-        state.diamonds = [];
-        state.selected.clear();
-        renderDiamonds();
-        log(`No HACD on ${addr} — click "Fill HIP-25 testnet seed" then Load portfolio`, "err");
-        return;
-      }
-      state.selected.clear();
-      state.diamonds = names.map((literal) => ({
-        literal,
-        status: "Loading",
-        accrued_reward: "0",
-        min_unstake_height: 0,
-        lending_id: mortgagedMap[literal] || "",
-      }));
-      renderDiamonds();
-      await Promise.all(
-        names.map(async (literal, idx) => {
-          try {
-            const st = await apiGet("query/staking/status", { diamond: literal });
-            state.diamonds[idx] = {
-              literal: st.literal || literal,
-              status: st.status || "unknown",
-              accrued_reward: st.accrued_reward || "0",
-              min_unstake_height: st.min_unstake_height || 0,
-              lending_id: mortgagedMap[literal] || "",
-            };
-          } catch (e) {
-            state.diamonds[idx] = {
-              literal,
-              status: mortgagedMap[literal] ? "Mortgaged" : "unknown",
-              accrued_reward: "0",
-              min_unstake_height: 0,
-              lending_id: mortgagedMap[literal] || "",
-            };
-          }
-        })
-      );
-      state.diamonds.sort((a, b) => a.literal.localeCompare(b.literal));
-      renderDiamonds();
-      log(`Loaded ${names.length} HACD`, "ok");
-    }
-
-    function parseSdkJson(raw) {
-      if (!raw || raw.startsWith("[ERROR]")) throw new Error(raw || "SDK error");
-      const trimmed = raw.trim();
-      if (!trimmed.startsWith("{")) throw new Error("SDK returned invalid JSON");
-      return JSON.parse(trimmed);
-    }
-
-    function loadSdkScript() {
-      return new Promise((resolve, reject) => {
-        if (typeof wasm_bindgen === "function") return resolve();
-        const s = document.createElement("script");
-        s.src = `${sdkOrigin()}/pkg/hacash_sdk.js`;
-        s.onload = () => resolve();
-        s.onerror = () => reject(new Error("failed to load /pkg/hacash_sdk.js"));
-        document.head.appendChild(s);
-      });
-    }
-
-    async function initWasmSdk() {
-      const el = $("sdkStatus");
-      try {
-        await loadSdkScript();
-        const wasmUrl = `${sdkOrigin()}/pkg/hacash_sdk_bg.wasm`;
-        await wasm_bindgen(wasmUrl);
-        state.wasm = wasm_bindgen;
-        el.textContent = "WASM SDK: ready — stake / unstake / mortgage (password stays in browser)";
-        el.className = "meta ok";
-        updateActionButtons();
-        await resolveSigningAddress();
-      } catch (e) {
-        el.textContent = `WASM SDK: ${e.message}`;
-        el.className = "meta err";
-      }
-    }
-
-    async function preflightMortgageOpen() {
-      const sel = selectedAvailableDiamonds();
-      if (!sel.length) throw new Error("Select Available HACD first");
-      const signer = await resolveSigningAddress();
-      if (!signer) throw new Error("Enter signing password (testnet: hip25test)");
-      const portfolio = $("address").value.trim();
-      if (portfolio && signer !== portfolio) {
-        throw new Error(`Password signs as ${signer} but portfolio is ${portfolio}. Use testnet seed + hip25test.`);
-      }
-      const p = await apiGet("query/mortgage/principal", { diamonds: sel.join(",") });
-      const loan = $("loanAmount").value.trim();
-      if (loan !== p.loan) {
-        $("loanAmount").value = p.loan || "";
-        throw new Error(`Loan corrected to ${p.loan} for ${sel.length} HACD — try again`);
-      }
-      const bal = await apiGet("query/balance", { address: signer });
-      const hac = bal.list?.[0]?.hacash || "0";
-      log(`Signer ${signer} balance ${hac} · need origination ${p.origination_burn} + fee ${$("fee").value.trim()}`, "ok");
-    }
-
-    async function submitStakeAction(kind) {
-      if (!state.wasm) throw new Error("WASM SDK required — build with scripts/build_wallet_sdk.ps1");
-      const pass = $("prikey").value.trim();
-      if (!pass) throw new Error("Password required for local signing");
-      const fee = $("fee").value.trim();
-      const chainIdStr = $("chainId").value.trim();
-      if (!state.hip25Dev && chainIdStr !== MAINNET_CHAIN_ID) {
-        throw new Error(`Mainnet wallet requires chain ID ${MAINNET_CHAIN_ID}`);
-      }
-      const chainId = BigInt(chainIdStr || MAINNET_CHAIN_ID);
-      const sel = [...state.selected];
-      if (!sel.length) throw new Error("Select at least one HACD");
-      const diamonds = sel.join(",");
-      const stake = kind === 34;
-      const fn = stake ? state.wasm.hacd_stake : state.wasm.hacd_unstake;
-      const ts = BigInt(txTimestamp());
-      log(`[WASM] ${stake ? "hacd_stake" : "hacd_unstake"} for ${diamonds} (ts=${ts})…`);
-      const raw = fn(chainId, pass, diamonds, fee, ts);
-      const tx = parseSdkJson(raw);
-      log(`Signed locally ${tx.tx_hash}`);
-      const submitted = await apiPost("submit/transaction", hexToBytes(tx.tx_body));
-      $("prikey").value = "";
-      log(`Submitted ${submitted.hash}`, "ok");
-      setTimeout(loadPortfolio, 3000);
-    }
-
-    $("rpc").value = sdkOrigin() || "http://127.0.0.1:8083";
-    $("rpc").addEventListener("change", warnRpcOriginMismatch);
-    $("rpc").addEventListener("blur", warnRpcOriginMismatch);
-
-    $("btnTestnet").onclick = () => {
-      if (!state.hip25Dev) {
-        log("Testnet seed fill is disabled on mainnet nodes", "err");
-        return;
-      }
-      $("address").value = TESTNET.address;
-      $("fee").value = TESTNET.fee;
-      $("chainId").value = "1";
-      $("rpc").value = sdkOrigin();
-      if (!$("prikey").value.trim()) $("prikey").value = TESTNET.password;
-      resolveSigningAddress().then(() => loadPortfolio()).catch((e) => log(e.message, "err"));
-      log("Filled testnet seed — password hip25test, loading portfolio…");
-    };
-
-    $("prikey").addEventListener("input", () => resolveSigningAddress());
-    $("address").addEventListener("input", updateAddressMismatchWarning);
-
-    $("btnLoad").onclick = () => loadPortfolio().catch((e) => log(e.message, "err"));
-    $("btnRefresh").onclick = () => loadPortfolio().catch((e) => log(e.message, "err"));
-    $("btnStake").onclick = () => submitStakeAction(34).catch((e) => log(e.message, "err"));
-    $("btnUnstake").onclick = () => submitStakeAction(35).catch((e) => log(e.message, "err"));
-    $("btnSelAll").onclick = () => {
-      state.diamonds.forEach((d) => {
-        if (d.status === "Available" || (d.status === "Staked" && state.height >= d.min_unstake_height))
-          state.selected.add(d.literal);
-      });
-      renderDiamonds();
-      scheduleLoanRefresh();
-    };
-    $("btnSelNone").onclick = () => {
-      state.selected.clear();
-      renderDiamonds();
-      $("mortgageCostHint").textContent = "";
-    };
-
-    function randomLendIdHex() {
-      const bytes = new Uint8Array(14);
-      bytes[0] = 0x4d;
-      crypto.getRandomValues(bytes.subarray(1, 13));
-      bytes[13] = 0x7a;
-      return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
-    }
-
-    $("btnNewLendId").onclick = () => {
-      $("lendId").value = randomLendIdHex();
-      updateActionButtons();
-    };
-
-    $("btnCalcLoan").onclick = () => calcLoanFromSelection().catch((e) => log(e.message, "err"));
-
-    $("btnMortgageQuote").onclick = async () => {
-      const id = $("lendId").value.trim();
-      if (!id) return log("Lending ID required", "err");
-      try {
-        const q = await apiGet("query/mortgage/contract", {
-          id,
-          redeemer: $("address").value.trim(),
-          height: state.height ? String(state.height) : "0",
-        });
-        $("ransomAmount").value = q.min_ransom || "";
-        $("mortgageMeta").textContent = `Redemption phase: ${q.redeem_phase || "—"} · min ransom: ${q.min_ransom || "—"}`;
-        log(`Quote: ${q.min_ransom} (${q.redeem_phase})`, "ok");
-      } catch (e) {
-        log(e.message, "err");
-      }
-    };
-
-    async function submitMortgage(kind) {
-      if (!state.wasm) throw new Error("WASM SDK required");
-      const pass = $("prikey").value.trim();
-      if (!pass) throw new Error("Password required");
-      const fee = $("fee").value.trim();
-      const chainId = BigInt($("chainId").value.trim() || MAINNET_CHAIN_ID);
-      const lendId = $("lendId").value.trim();
-      const ts = BigInt(txTimestamp());
-      let raw;
-      if (kind === 15) {
-        await preflightMortgageOpen();
-        const sel = selectedAvailableDiamonds();
-        const loan = $("loanAmount").value.trim();
-        const bp = parseInt($("borrowPeriod").value, 10);
-        if (!lendId || !loan) throw new Error("Lending ID and loan amount required");
-        raw = state.wasm.hacd_mortgage_open(chainId, pass, lendId, sel.join(","), loan, bp, fee, ts);
-      } else {
-        const ransom = $("ransomAmount").value.trim();
-        if (!lendId || !ransom) throw new Error("Lending ID and ransom required");
-        raw = state.wasm.hacd_mortgage_redeem(chainId, pass, lendId, ransom, fee, ts);
-      }
-      const tx = parseSdkJson(raw);
-      log(`Signed ${tx.action} ${tx.tx_hash}`);
-      let submitted;
-      try {
-        submitted = await apiPost("submit/transaction", hexToBytes(tx.tx_body));
-      } catch (e) {
-        throw new Error(explainSubmitError(e.message));
-      }
-      $("prikey").value = "";
-      log(`Submitted ${submitted.hash}`, "ok");
-      setTimeout(loadPortfolio, 3000);
-    }
-
-    $("btnMortgageOpen").onclick = () => submitMortgage(15).catch((e) => log(e.message, "err"));
-    $("btnMortgageRedeem").onclick = () => submitMortgage(16).catch((e) => log(e.message, "err"));
-
-    async function bootstrap() {
-      await initWasmSdk();
-      try {
-        const latest = await apiGet("query/latest");
-        if (latest.chain_id !== undefined) $("chainId").value = String(latest.chain_id);
-        state.hip25Dev = !!latest.hip25_dev;
-        if (latest.hip25_dev) {
-          $("networkTag").textContent = "HIP-25 testnet";
-          if (!$("address").value.trim()) {
-            $("address").value = TESTNET.address;
-            $("fee").value = TESTNET.fee;
-            $("chainId").value = "1";
-          }
-          if (!$("lendId").value.trim()) $("lendId").value = randomLendIdHex();
-          setTimeout(() => loadPortfolio().catch((e) => log(e.message, "err")), 800);
-        } else {
-          $("btnTestnet").style.display = "none";
-          $("chainId").value = MAINNET_CHAIN_ID;
-          $("chainId").readOnly = true;
-          $("networkTag").textContent = `Mainnet chain ${MAINNET_CHAIN_ID}`;
-        }
-      } catch (e) {
-        log(e.message, "err");
-      }
-    }
-    bootstrap();
-  </script>
+  <script src="/hip25/wallet/js/core.js"></script>
+  <script src="/hip25/wallet/js/api.js"></script>
+  <script src="/hip25/wallet/js/signing.js"></script>
+  <script src="/hip25/wallet/js/portfolio.js"></script>
+  <script src="/hip25/wallet/js/mortgage.js"></script>
+  <script src="/hip25/wallet/js/app.js"></script>
 </body>
 </html>

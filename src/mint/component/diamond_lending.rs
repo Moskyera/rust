@@ -99,7 +99,8 @@ StructFieldStruct!(MortgageOwnerIndex,
     ids : BytesW4
 );
 
-const MORTGAGE_OWNER_INDEX_MAX: usize = 64;
+/// Max active mortgage contracts indexed per owner (wallet portfolio RPC).
+pub const MORTGAGE_OWNER_INDEX_MAX: usize = 64;
 
 impl MortgageOwnerIndex {
     pub fn iter_ids(&self) -> Vec<DiamondSyslendId> {

@@ -568,6 +568,13 @@ mod mortgage_tests {
     }
 
     #[test]
+    fn origination_burn_amount_for_testnet_principal() {
+        let principal = Amount::from_mei(200).unwrap();
+        let burn = mortgage_origination_burn(&principal).unwrap();
+        assert_eq!(burn.to_fin_string(), "2:248");
+    }
+
+    #[test]
     fn private_early_redeem_zero_interest_at_open() {
         let contract = DiamondSystemLending {
             is_ransomed: Uint1::from(0),

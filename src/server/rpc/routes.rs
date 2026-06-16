@@ -6,6 +6,12 @@ pub fn routes(mut ctx: ApiCtx) -> Router {
     
     let lrt = Router::new()
     .route("/hip25/wallet", get(hip25_wallet_page))
+    .route("/hip25/wallet/js/core.js", get(hip25_wallet_core_js))
+    .route("/hip25/wallet/js/api.js", get(hip25_wallet_api_js))
+    .route("/hip25/wallet/js/signing.js", get(hip25_wallet_signing_js))
+    .route("/hip25/wallet/js/portfolio.js", get(hip25_wallet_portfolio_js))
+    .route("/hip25/wallet/js/mortgage.js", get(hip25_wallet_mortgage_js))
+    .route("/hip25/wallet/js/app.js", get(hip25_wallet_app_js))
     .route("/pkg/hacash_sdk.js", get(hip25_sdk_js))
     .route("/pkg/hacash_sdk_bg.wasm", get(hip25_sdk_wasm))
     .route("/", get(console))

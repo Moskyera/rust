@@ -50,8 +50,8 @@ async fn staking_status(State(ctx): State<ApiCtx>, q: Query<QStakingStatus>) -> 
 
 defineQueryObject!{ QStakingSummary,
     address, String, s!(""),
-    offset, Option<String>, None,
-    limit, Option<String>, None,
+    offset, String, s!("0"),
+    limit, String, s!("200"),
 }
 
 async fn staking_summary(State(ctx): State<ApiCtx>, q: Query<QStakingSummary>) -> impl IntoResponse {
@@ -65,8 +65,8 @@ async fn staking_summary(State(ctx): State<ApiCtx>, q: Query<QStakingSummary>) -
     let owned = mintstate.diamond_owned(&adr).unwrap_or_default();
     let names = owned.readable();
     let global = mintstate.staking_global();
-    let mut offset = q.offset.as_deref().unwrap_or("0").parse::<usize>().unwrap_or(0);
-    let mut limit = q.limit.as_deref().unwrap_or("200").parse::<usize>().unwrap_or(200);
+    let mut offset = q.offset.parse::<usize>().unwrap_or(0);
+    let mut limit = q.limit.parse::<usize>().unwrap_or(200);
     if limit == 0 {
         limit = 200;
     }
@@ -198,4 +198,30 @@ async fn staking_events(State(ctx): State<ApiCtx>, q: Query<QStakingEvents>) -> 
         "events", items,
     };
     api_data(data)
+}
+
+#[cfg(test)]
+mod staking_query_tests {
+    use super::*;
+
+    #[test]
+    fn staking_summary_deserializes_without_pagination() {
+        let q: QStakingSummary = serde_urlencoded::from_str(
+            "address=1Do17BuqMj5N4EZRuquXtoCCHFZpQoHyc2",
+        )
+        .expect("address-only query must deserialize");
+        assert_eq!(q.address, "1Do17BuqMj5N4EZRuquXtoCCHFZpQoHyc2");
+        assert_eq!(q.offset, "0");
+        assert_eq!(q.limit, "200");
+    }
+
+    #[test]
+    fn staking_summary_deserializes_explicit_pagination() {
+        let q: QStakingSummary = serde_urlencoded::from_str(
+            "address=1Do17BuqMj5N4EZRuquXtoCCHFZpQoHyc2&offset=10&limit=50",
+        )
+        .expect("paginated query must deserialize");
+        assert_eq!(q.offset, "10");
+        assert_eq!(q.limit, "50");
+    }
 }
