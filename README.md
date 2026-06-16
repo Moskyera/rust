@@ -24,3 +24,24 @@ Each layer of the architecture has independent functions and responsibilities fo
 6. [Server] Server - RPC API interface service, block and transaction and account data query, other services, etc.
 7. [Miner] Miner - block construction and mining, diamond mining, transaction memory pool, mining pool server, mining pool worker, etc.
 
+
+### HIP-25 HACD staking (community review)
+
+**Branch:** [`hip-25-staking`](https://github.com/Moskyera/rust/tree/hip-25-staking) · **Release:** [`v0.1.0-hip25-mainnet`](https://github.com/Moskyera/rust/releases/tag/v0.1.0-hip25-mainnet) · **Audits:** 5/5 PASS @ `a798094`
+
+| Mode | Launcher | Port | Notes |
+|------|----------|------|-------|
+| Testnet demo | `scripts\START_WALLET.bat` | 8083 | Fresh dev chain, poworker, wipes demo data |
+| Mainnet wallet | `scripts\START_MAINNET_WALLET.bat` | 8081 | Release build, synced `data_dir`, no data wipe |
+
+**Mainnet build (once):**
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\BUILD_MAINNET_RELEASE.ps1
+```
+
+**Community review / voting:** [docs/HIP25_COMMUNITY_REVIEW.md](docs/HIP25_COMMUNITY_REVIEW.md)  
+**Upstream PR (copy-paste body):** [docs/UPSTREAM_PR.md](docs/UPSTREAM_PR.md)  
+**Open PR to official repo:** https://github.com/hacash/rust/compare/main...Moskyera:rust:hip-25-staking?expand=1
+
+Config template: `hacash_mainnet_hip25.config.ini.example` (`chain_id=0`, loopback RPC, client WASM signing only).
+

@@ -1,0 +1,30 @@
+name: HIP-25 CI
+
+on:
+  push:
+    branches: [hip-25-staking]
+    tags: ["v*-hip25-*"]
+  pull_request:
+    branches: [hip-25-staking]
+
+jobs:
+  staking-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run HIP-25 staking unit tests
+        run: cargo test --bin hacash staking_tests
+
+  security-audit-note:
+    runs-on: ubuntu-latest
+    needs: staking-tests
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify security artifacts present
+        run: |
+          test -f src/server/security.rs
+          test -f hacash_mainnet_hip25.config.ini.example
+          test -f wallet/hip25/index.html
+          test -f scripts/START_MAINNET_WALLET.bat
+          echo "HIP-25 mainnet artifacts OK"
