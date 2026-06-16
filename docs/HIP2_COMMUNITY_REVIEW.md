@@ -3,7 +3,7 @@
 **Proposal:** Merge HIP-2 HACD system mortgage (actions 15/16) into Hacash Rust fullnode alongside HIP-25 staking.  
 **Fork:** https://github.com/Moskyera/rust/tree/hip-25-staking  
 **Economics version:** `v2.1` (1% origination, 3% flat APR, 3-period grace, 103% auction floor)  
-**Audit status:** 5 independent security audits — **PASS** (see [HIP2_SECURITY_AUDITS.md](./HIP2_SECURITY_AUDITS.md))
+**Audit status:** 5 independent security audits — **PASS** @ `1c96a73` (see [HIP2_SECURITY_AUDITS.md](./HIP2_SECURITY_AUDITS.md))
 
 ---
 

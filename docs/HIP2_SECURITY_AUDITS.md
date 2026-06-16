@@ -5,7 +5,7 @@
 **Economics:** v2.1 (1% origination, 3% flat APR, 3-period grace, 103% auction floor)  
 **Test evidence:** 24 `mortgage_*` tests + 24 `staking_tests` (HIP-25 regression) — all **PASS**
 
-> Commit hash is recorded in the audit table footer after the readiness commit is pushed.
+> Audited commit: `1c96a73`
 
 ---
 
@@ -198,4 +198,4 @@ Before setting `mortgage_activation_height > 0` on mainnet:
 | Branch | `hip-25-staking` |
 | Economics | v2.1 |
 | Audits | 5 / 5 **PASS** |
-| Commit | *(updated on push)* |
+| Commit | `1c96a73` |
