@@ -23,6 +23,7 @@ defineChainStateOperationInstance!{
         &[2, 1], total_count      , TotalCount
         &[2, 2], latest_diamond   , DiamondSmelt
         &[2, 3], staking_global   , GlobalStakingState
+        &[2, 4], mortgage_global  , GlobalMortgageState
     )
     (
         &[2, 21], diamond_ptr   , DiamondNumber    , DiamondName
@@ -32,6 +33,7 @@ defineChainStateOperationInstance!{
         &[2, 25], staking_record     , DiamondName      , StakingRecord
         &[2, 26], staking_unlock_entry, Uint5           , StakingUnlockEntry
         &[2, 27], staking_event        , Uint5           , StakingEvent
+        &[2, 28], diamond_syslend      , DiamondSyslendId , DiamondSystemLending
     )
 }
 

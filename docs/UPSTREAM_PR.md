@@ -9,7 +9,7 @@ https://github.com/hacash/rust/compare/main...Moskyera:rust:hip-25-staking?expan
 ## PR Title
 
 ```
-HIP-25: HACD staking (kinds 34/35), WASM wallet, mainnet security hardening
+HIP-25: HACD staking (kinds 34/35) + HIP-2 v2 mortgage (kinds 15/16), WASM wallet, mainnet security hardening
 ```
 
 ---

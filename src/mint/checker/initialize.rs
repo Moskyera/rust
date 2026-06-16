@@ -18,6 +18,23 @@ fn impl_initialize(this: &BlockMintChecker, db: &mut dyn State) -> RetErr {
         mint_state.set_staking_global(&global);
     }
 
+    {
+        let mut mint_state = MintState::wrap(db);
+        let mut mg = mint_state.mortgage_global();
+        mg.activation_height = BlockHeight::from(this.cnf.mortgage_activation_height);
+        let cap = this.cnf.mortgage_max_outstanding_zhu;
+        mg.max_outstanding_ioo_zhu = Uint8::from(if cap > 0 {
+            cap
+        } else {
+            MORTGAGE_DEFAULT_MAX_OUTSTANDING_ZHU
+        });
+        if this.cnf.hip25_testnet_seed && this.cnf.hip2_testnet_demo_periods {
+            mg.demo_period_blocks = Uint5::from(10);
+            println!("[HIP-2 testnet demo] mortgage period = 10 blocks");
+        }
+        mint_state.set_mortgage_global(&mg);
+    }
+
     if this.cnf.hip25_testnet_seed {
         let acc = Account::create_by_password(&this.cnf.hip25_testnet_seed_password)
             .map_err(|e| e.to_string())?;

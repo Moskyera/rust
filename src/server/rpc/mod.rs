@@ -68,6 +68,7 @@ include!("miner.rs");
 include!("diamond_miner.rs");
 
 include!("staking.rs");
+include!("mortgage.rs");
 include!("wallet_ui.rs");
 
 

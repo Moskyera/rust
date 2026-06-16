@@ -37,6 +37,9 @@ pub fn routes(mut ctx: ApiCtx) -> Router {
     .route(&query("staking/global"), get(staking_global))
     .route(&query("staking/events"), get(staking_events))
 
+    .route(&query("mortgage/global"), get(mortgage_global))
+    .route(&query("mortgage/contract"), get(mortgage_contract))
+
     .route(&query("fee/average"), get(fee_average))
 
     .route(&query("miner/notice"), get(miner_notice))

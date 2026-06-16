@@ -861,6 +861,9 @@ mod staking_tests {
             hip25_testnet_seed: true,
             hip25_testnet_seed_password: "hip25test".to_string(),
             hip25_testnet_demo_periods: false,
+            mortgage_activation_height: 0,
+            mortgage_max_outstanding_zhu: 0,
+            hip2_testnet_demo_periods: false,
         };
         assert!(cnf.validate_hip25_dev_flags().is_err());
     }

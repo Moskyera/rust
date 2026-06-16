@@ -49,6 +49,11 @@ impl BlockStore {
         }
     }
 
+    /// Share an existing LevelDB handle (avoids duplicate LOCK on the same directory).
+    pub fn from_shared(ldb: Arc<LevelDB>) -> BlockStore {
+        BlockStore { ldb }
+    }
+
 
 }
 
