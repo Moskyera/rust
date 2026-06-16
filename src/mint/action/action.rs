@@ -35,6 +35,8 @@ pub const ACTION_KIND_ID_DIAMOND_MINT: u16 = 4;
 pubFnRegExtendActionCreates!{
     DiamondStake             // 34  HIP-25
     DiamondUnstake           // 35  HIP-25
+    MortgageOpen             // 15  HIP-2 v2.1
+    MortgageRedeem           // 16  HIP-2 v2.1
 }
 
 // reg action

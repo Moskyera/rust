@@ -24,4 +24,6 @@ include!("channel.rs");
 include!("diamond.rs");
 include!("staking.rs");
 include!("diamond_lending.rs");
+#[cfg(test)]
+include!("diamond_lending_e2e.rs");
 

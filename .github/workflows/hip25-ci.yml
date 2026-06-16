@@ -15,6 +15,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Run HIP-25 staking unit tests
         run: cargo test staking_tests
+      - name: Run HIP-2 mortgage unit + E2E tests
+        run: cargo test mortgage_
+      - name: Verify HIP-2 documentation
+        run: |
+          test -f docs/HIP2_MORTGAGE_V2.md
+          test -f docs/HIP2_COMMUNITY_REVIEW.md
+          test -f docs/HIP2_SECURITY_AUDITS.md
 
   release-build:
     runs-on: ubuntu-latest

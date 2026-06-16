@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>HIP-25 HACD Staking Wallet</title>
+  <title>HIP-25 Staking + HIP-2 Mortgage Wallet</title>
   <style>
     :root {
       --bg: #0f1419;
@@ -121,6 +121,7 @@
     .badge-Cooldown { background: #3d3020; color: var(--amber); }
     .badge-unknown { background: #333; color: var(--muted); }
     .badge-Loading { background: #243044; color: var(--muted); }
+    .badge-Mortgaged { background: #3d2020; color: var(--red); }
     .literal { font-family: ui-monospace, monospace; font-weight: 600; letter-spacing: 0.05em; }
     .meta { font-size: 0.75rem; color: var(--muted); }
     #log {
@@ -138,7 +139,7 @@
 </head>
 <body>
   <header>
-    <h1>HIP-25 HACD Staking</h1>
+    <h1>HIP-25 Staking · HIP-2 Mortgage</h1>
     <span class="tag" id="networkTag">Wallet MVP</span>
   </header>
   <main>
@@ -183,7 +184,38 @@
         <div class="stat"><div class="val" id="sAccrued">—</div><div class="lbl">Accrued rewards</div></div>
         <div class="stat"><div class="val" id="sHeight">—</div><div class="lbl">Chain height</div></div>
         <div class="stat"><div class="val" id="sPool">—</div><div class="lbl">Pool (zhu)</div></div>
+        <div class="stat"><div class="val" id="sMortgageIoU">—</div><div class="lbl">Mortgage IOU (zhu)</div></div>
+        <div class="stat"><div class="val" id="sMortgageApr">—</div><div class="lbl">Mortgage APR</div></div>
       </div>
+    </section>
+
+    <section class="panel">
+      <h2>HIP-2 Mortgage</h2>
+      <div class="grid-2">
+        <div>
+          <label for="lendId">Lending ID (28 hex chars = 14 bytes)</label>
+          <input id="lendId" placeholder="4d01…" />
+        </div>
+        <div>
+          <label for="borrowPeriod">Borrow period T (1–20)</label>
+          <input id="borrowPeriod" type="number" min="1" max="20" value="5" />
+        </div>
+        <div>
+          <label for="loanAmount">Loan amount (must match Σ bid-burn)</label>
+          <input id="loanAmount" placeholder="100" />
+        </div>
+        <div>
+          <label for="ransomAmount">Ransom amount (min from contract query)</label>
+          <input id="ransomAmount" placeholder="100" />
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-primary" id="btnMortgageOpen" disabled>Open mortgage (15)</button>
+        <button class="btn-unstake" id="btnMortgageRedeem" disabled>Redeem (16)</button>
+        <button class="btn-ghost" id="btnMortgageQuote">Quote min ransom</button>
+        <button class="btn-ghost" id="btnNewLendId">New lending ID</button>
+      </div>
+      <div class="meta" id="mortgageMeta" style="margin-top:0.75rem">Select Available HACD for open; mortgaged HACD for redeem quote.</div>
     </section>
 
     <section class="panel">
@@ -310,10 +342,11 @@
         row.className = "diamond-row" + (state.selected.has(d.literal) ? " selected" : "");
         const canStake = d.status === "Available";
         const canUnstake = d.status === "Staked" && state.height >= d.min_unstake_height;
+        const isMortgaged = d.status === "Mortgaged" || d.status === "unknown" && d.mortgaged;
         const cb = document.createElement("input");
         cb.type = "checkbox";
         cb.checked = state.selected.has(d.literal);
-        cb.disabled = !canStake && !canUnstake;
+        cb.disabled = !canStake && !canUnstake && !isMortgaged;
         cb.onchange = () => {
           if (cb.checked) state.selected.add(d.literal);
           else state.selected.delete(d.literal);
@@ -342,9 +375,12 @@
       const byName = Object.fromEntries(state.diamonds.map((d) => [d.literal, d]));
       const canStake = sel.some((n) => byName[n]?.status === "Available");
       const canUnstake = sel.some((n) => byName[n]?.status === "Staked" && state.height >= (byName[n].min_unstake_height || 0));
+      const canMortgageOpen = sel.some((n) => byName[n]?.status === "Available");
       const wasmOk = !!state.wasm;
       $("btnStake").disabled = !wasmOk || !canStake;
       $("btnUnstake").disabled = !wasmOk || !canUnstake;
+      $("btnMortgageOpen").disabled = !wasmOk || !canMortgageOpen;
+      $("btnMortgageRedeem").disabled = !wasmOk || !$("lendId").value.trim();
     }
 
     async function loadPortfolio(opts = {}) {
@@ -368,6 +404,14 @@
 
       const global = await apiGet("query/staking/global");
       $("sPool").textContent = global.reward_pool_pending_zhu ?? "—";
+      try {
+        const mg = await apiGet("query/mortgage/global");
+        $("sMortgageIoU").textContent = mg.outstanding_ioo_zhu ?? "—";
+        $("sMortgageApr").textContent = mg.apr_bps ? `${(mg.apr_bps / 100).toFixed(1)}%` : "—";
+      } catch (_) {
+        $("sMortgageIoU").textContent = "—";
+        $("sMortgageApr").textContent = "—";
+      }
 
       const bal = await apiGet("query/balance", { address: addr, diamonds: "true" });
       const entry = bal.list?.[0] || {};
@@ -445,7 +489,7 @@
         const wasmUrl = `${sdkOrigin()}/pkg/hacash_sdk_bg.wasm`;
         await wasm_bindgen(wasmUrl);
         state.wasm = wasm_bindgen;
-        el.textContent = "WASM SDK: ready — hacd_stake / hacd_unstake (password stays in browser)";
+        el.textContent = "WASM SDK: ready — stake / unstake / mortgage (password stays in browser)";
         el.className = "meta ok";
         updateActionButtons();
       } catch (e) {
@@ -509,6 +553,68 @@
       renderDiamonds();
     };
     $("btnSelNone").onclick = () => { state.selected.clear(); renderDiamonds(); };
+
+    function randomLendIdHex() {
+      const bytes = new Uint8Array(14);
+      bytes[0] = 0x4d;
+      crypto.getRandomValues(bytes.subarray(1, 13));
+      bytes[13] = 0x7a;
+      return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+    }
+
+    $("btnNewLendId").onclick = () => {
+      $("lendId").value = randomLendIdHex();
+      updateActionButtons();
+    };
+
+    $("btnMortgageQuote").onclick = async () => {
+      const id = $("lendId").value.trim();
+      if (!id) return log("Lending ID required", "err");
+      try {
+        const q = await apiGet("query/mortgage/contract", {
+          id,
+          redeemer: $("address").value.trim(),
+          height: String(state.height),
+        });
+        $("ransomAmount").value = q.min_ransom || "";
+        $("mortgageMeta").textContent = `Phase: ${q.redeem_phase || "—"} · min ransom: ${q.min_ransom || "—"}`;
+        log(`Quote: ${q.min_ransom} (${q.redeem_phase})`, "ok");
+      } catch (e) {
+        log(e.message, "err");
+      }
+    };
+
+    async function submitMortgage(kind) {
+      if (!state.wasm) throw new Error("WASM SDK required");
+      const pass = $("prikey").value.trim();
+      if (!pass) throw new Error("Password required");
+      const fee = $("fee").value.trim();
+      const chainId = BigInt($("chainId").value.trim() || MAINNET_CHAIN_ID);
+      const lendId = $("lendId").value.trim();
+      const ts = BigInt(txTimestamp());
+      let raw;
+      if (kind === 15) {
+        const sel = [...state.selected].filter((n) => state.diamonds.find((d) => d.literal === n)?.status === "Available");
+        if (!sel.length) throw new Error("Select Available HACD");
+        const loan = $("loanAmount").value.trim();
+        const bp = parseInt($("borrowPeriod").value, 10);
+        if (!lendId || !loan) throw new Error("Lending ID and loan amount required");
+        raw = state.wasm.hacd_mortgage_open(chainId, pass, lendId, sel.join(","), loan, bp, fee, ts);
+      } else {
+        const ransom = $("ransomAmount").value.trim();
+        if (!lendId || !ransom) throw new Error("Lending ID and ransom required");
+        raw = state.wasm.hacd_mortgage_redeem(chainId, pass, lendId, ransom, fee, ts);
+      }
+      const tx = parseSdkJson(raw);
+      log(`Signed ${tx.action} ${tx.tx_hash}`);
+      const submitted = await apiPost("submit/transaction", hexToBytes(tx.tx_body));
+      $("prikey").value = "";
+      log(`Submitted ${submitted.hash}`, "ok");
+      setTimeout(loadPortfolio, 3000);
+    }
+
+    $("btnMortgageOpen").onclick = () => submitMortgage(15).catch((e) => log(e.message, "err"));
+    $("btnMortgageRedeem").onclick = () => submitMortgage(16).catch((e) => log(e.message, "err"));
 
     async function bootstrap() {
       await initWasmSdk();

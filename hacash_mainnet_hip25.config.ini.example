@@ -24,6 +24,10 @@ staking_activation_height = 0
 hip25_testnet_seed = false
 hip25_testnet_seed_password = hip25test
 hip25_testnet_demo_periods = false
+; HIP-2 v2.1 mortgage — 0 = disabled until governance sets height (≥30 day notice).
+mortgage_activation_height = 0
+mortgage_max_outstanding_zhu = 0
+hip2_testnet_demo_periods = false
 
 [miner]
 enable = false

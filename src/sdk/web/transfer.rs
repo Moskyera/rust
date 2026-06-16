@@ -3,7 +3,7 @@ use std::sync::Once;
 use crate::core::account::Account;
 use crate::core::field::DiamondNameListMax200;
 use crate::interface::field::Field;
-use crate::mint::action::{DiamondStake, DiamondUnstake};
+use crate::mint::action::{DiamondStake, DiamondUnstake, MortgageOpen, MortgageRedeem};
 
 static SDK_INIT: Once = Once::new();
 
@@ -332,4 +332,119 @@ pub fn hacd_unstake(
     timestamp: i64,
 ) -> String {
     build_signed_stake_tx(chain_id, from_pass, diamond_name_list, fee, timestamp, false)
+}
+
+fn parse_lending_id_hex(hex_id: &str) -> Result<DiamondSyslendId, String> {
+    let clean: String = hex_id.chars().filter(|c| !c.is_whitespace()).collect();
+    let bytes = hex::decode(&clean).map_err(|e| e.to_string())?;
+    if bytes.len() != DIAMOND_SYSLEND_ID_SIZE {
+        return Err(format!(
+            "lending id must be {} bytes hex",
+            DIAMOND_SYSLEND_ID_SIZE
+        ));
+    }
+    let arr: [u8; DIAMOND_SYSLEND_ID_SIZE] = bytes.try_into().map_err(|_| "id length")?;
+    Ok(DiamondSyslendId::cons(arr))
+}
+
+fn mortgage_tx_json(
+    tx: &TransactionType2,
+    fee: &Amount,
+    acc: &Account,
+    time_set: i64,
+    action_label: &str,
+    extra: &str,
+) -> String {
+    let ok = format!(
+        r##""tx_hash":"{}","tx_body":"{}","action":"{}","fee":"{}","main_address":"{}","timestamp":{}{}"##,
+        tx.hash().hex(),
+        hex::encode(tx.serialize()),
+        action_label,
+        fee.to_fin_string(),
+        acc.readable(),
+        time_set,
+        extra
+    );
+    format!("{{{}}}", ok)
+}
+
+/// HIP-2 v2.1: open system mortgage (action kind 15).
+#[wasm_bindgen]
+pub fn hacd_mortgage_open(
+    chain_id: u64,
+    mut from_pass: String,
+    lending_id_hex: String,
+    diamond_name_list: String,
+    loan_amount: String,
+    borrow_period: u8,
+    fee: String,
+    timestamp: i64,
+) -> String {
+    ensure_sdk_init();
+    let time_set = get_time_set(timestamp);
+    let dlist = or_return! { "Diamond list", parse_diamond_list(diamond_name_list) };
+    let lend_id = or_return! { "Lending id", parse_lending_id_hex(&lending_id_hex) };
+    let principal = or_return! { "Loan amount", Amount::from_string_unsafe(&loan_amount) };
+    let fee = or_return! { "Fee", Amount::from_string_unsafe(&fee) };
+    if borrow_period < 1 || borrow_period > 20 {
+        return "[ERROR] borrow_period must be 1..20".to_string();
+    }
+    let acc = or_return! { "Account", Account::create_by(&from_pass) };
+    from_pass.clear();
+    let addr = or_return! { "Address", Address::from_readable(acc.readable()) };
+    let mut tx = TransactionType2::build(addr, fee.clone());
+    tx.timestamp = Timestamp::from(time_set as u64);
+    if_add_chain_id(chain_id, &mut tx);
+    let mut act = MortgageOpen::new();
+    act.lending_id = lend_id;
+    act.mortgage_diamonds = dlist.clone();
+    act.loan_total_amount = principal.clone();
+    act.borrow_period = Uint1::from(borrow_period);
+    if let Err(e) = tx.push_action(Box::new(act)) {
+        return format!("[ERROR] push mortgage open: {}", e);
+    }
+    if let Err(e) = tx.fill_sign(&acc) {
+        return format!("[ERROR] fill_sign: {}", e);
+    }
+    let extra = format!(
+        r##","diamonds":"{}","loan":"{}","borrow_period":{}"##,
+        dlist.readable(),
+        principal.to_fin_string(),
+        borrow_period
+    );
+    mortgage_tx_json(&tx, &fee, &acc, time_set, "mortgage_open", &extra)
+}
+
+/// HIP-2 v2.1: redeem mortgaged HACD (action kind 16).
+#[wasm_bindgen]
+pub fn hacd_mortgage_redeem(
+    chain_id: u64,
+    mut from_pass: String,
+    lending_id_hex: String,
+    ransom_amount: String,
+    fee: String,
+    timestamp: i64,
+) -> String {
+    ensure_sdk_init();
+    let time_set = get_time_set(timestamp);
+    let lend_id = or_return! { "Lending id", parse_lending_id_hex(&lending_id_hex) };
+    let ransom = or_return! { "Ransom", Amount::from_string_unsafe(&ransom_amount) };
+    let fee = or_return! { "Fee", Amount::from_string_unsafe(&fee) };
+    let acc = or_return! { "Account", Account::create_by(&from_pass) };
+    from_pass.clear();
+    let addr = or_return! { "Address", Address::from_readable(acc.readable()) };
+    let mut tx = TransactionType2::build(addr, fee.clone());
+    tx.timestamp = Timestamp::from(time_set as u64);
+    if_add_chain_id(chain_id, &mut tx);
+    let mut act = MortgageRedeem::new();
+    act.lending_id = lend_id;
+    act.ransom_amount = ransom.clone();
+    if let Err(e) = tx.push_action(Box::new(act)) {
+        return format!("[ERROR] push mortgage redeem: {}", e);
+    }
+    if let Err(e) = tx.fill_sign(&acc) {
+        return format!("[ERROR] fill_sign: {}", e);
+    }
+    let extra = format!(r##","ransom":"{}""##, ransom.to_fin_string());
+    mortgage_tx_json(&tx, &fee, &acc, time_set, "mortgage_redeem", &extra)
 }
