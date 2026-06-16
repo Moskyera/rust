@@ -50,8 +50,8 @@ async fn staking_status(State(ctx): State<ApiCtx>, q: Query<QStakingStatus>) -> 
 
 defineQueryObject!{ QStakingSummary,
     address, String, s!(""),
-    offset, String, s!("0"),
-    limit, String, s!("200"),
+    offset, Option<String>, None,
+    limit, Option<String>, None,
 }
 
 async fn staking_summary(State(ctx): State<ApiCtx>, q: Query<QStakingSummary>) -> impl IntoResponse {
@@ -65,8 +65,8 @@ async fn staking_summary(State(ctx): State<ApiCtx>, q: Query<QStakingSummary>) -
     let owned = mintstate.diamond_owned(&adr).unwrap_or_default();
     let names = owned.readable();
     let global = mintstate.staking_global();
-    let mut offset = q.offset.parse::<usize>().unwrap_or(0);
-    let mut limit = q.limit.parse::<usize>().unwrap_or(200);
+    let mut offset = q.offset.as_deref().unwrap_or("0").parse::<usize>().unwrap_or(0);
+    let mut limit = q.limit.as_deref().unwrap_or("200").parse::<usize>().unwrap_or(200);
     if limit == 0 {
         limit = 200;
     }

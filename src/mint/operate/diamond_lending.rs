@@ -37,6 +37,15 @@ fn mortgage_origination_fee_zhu(principal_zhu: u64) -> u64 {
     principal_zhu * MORTGAGE_ORIGINATION_FEE_BPS / 10_000
 }
 
+pub fn mortgage_origination_burn(principal: &Amount) -> Ret<Amount> {
+    let zhu = mortgage_principal_zhu(principal)?;
+    let orig_zhu = mortgage_origination_fee_zhu(zhu);
+    if orig_zhu == 0 {
+        return Ok(Amount::default());
+    }
+    Amount::from_zhu(orig_zhu as i64)
+}
+
 /// Elapsed full periods since contract creation.
 fn mortgage_elapsed_periods(create_height: u64, height: u64, period_blocks: u64) -> u64 {
     if height <= create_height || period_blocks == 0 {

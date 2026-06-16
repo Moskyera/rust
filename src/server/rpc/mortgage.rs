@@ -1,6 +1,6 @@
 
 use crate::mint::component::*;
-use crate::mint::operate::{mortgage_calc_ransom, mortgage_compute_principal};
+use crate::mint::operate::{mortgage_calc_ransom, mortgage_compute_principal, mortgage_origination_burn};
 
 defineQueryObject!{ QMortgageGlobal,
     __nnn_, Option<bool>, None,
@@ -171,10 +171,15 @@ async fn mortgage_principal(State(ctx): State<ApiCtx>, q: Query<QMortgagePrincip
         Ok(p) => p,
         Err(e) => return api_error(&e),
     };
+    let origination_burn = mortgage_origination_burn(&principal)
+        .map(|a| a.to_unit_string(&unit))
+        .unwrap_or_else(|_| "0".to_string());
     let data = jsondata!{
         "loan", principal.to_unit_string(&unit),
         "diamonds", list.readable(),
         "origination_fee_bps", MORTGAGE_ORIGINATION_FEE_BPS,
+        "origination_burn", origination_burn,
+        "hacd_count", list.count().uint(),
     };
     api_data(data)
 }

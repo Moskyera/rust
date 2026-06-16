@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>HIP-25 Staking + HIP-2 Mortgage Wallet</title>
+  <title>HIP-25 Staking · HIP-2 Mortgage Wallet</title>
   <style>
     :root {
       --bg: #0f1419;
@@ -59,7 +59,35 @@
     }
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
     @media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } }
-    label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.35rem; }
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 0.25rem;
+    }
+    .field-hint {
+      display: block;
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+      line-height: 1.35;
+    }
+    .field-example {
+      font-family: ui-monospace, monospace;
+      font-size: 0.68rem;
+      color: #6b7f99;
+    }
+    .steps {
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.6;
+      padding: 0.75rem 0.9rem;
+      background: var(--bg);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    .steps strong { color: var(--text); }
     input, select {
       width: 100%;
       padding: 0.55rem 0.75rem;
@@ -144,26 +172,36 @@
   </header>
   <main>
     <section class="panel">
-      <h2>Connection</h2>
+      <h2>Wallet connection</h2>
       <div class="grid-2">
         <div>
-          <label for="rpc">RPC base URL</label>
+          <label for="rpc">Node RPC URL</label>
+          <span class="field-hint">Where your local fullnode listens. Usually the same as this wallet page URL.</span>
           <input id="rpc" value="" placeholder="http://127.0.0.1:8083" />
         </div>
         <div>
-          <label for="fee">Tx fee</label>
-          <input id="fee" value="0:247" />
+          <label for="fee">Transaction fee</label>
+          <span class="field-hint">Fee paid on every tx, in HAC amount format. <span class="field-example">e.g. 0:247</span></span>
+          <input id="fee" value="0:247" title="HAC amount format: integer:decimals" />
         </div>
         <div>
-          <label for="address">Address</label>
-          <input id="address" placeholder="1Do17Buq..." />
+          <label for="address">Portfolio address (read balances)</label>
+          <span class="field-hint">Address used to load HAC/HACD. For testnet seed use <span class="field-example">1Do17BuqMj5N4EZRuquXtoCCHFZpQoHyc2</span>.</span>
+          <input id="address" placeholder="1Do17BuqMj5N4EZRuquXtoCCHFZpQoHyc2" />
         </div>
         <div>
-          <label for="prikey">Password (local WASM sign only — never sent to RPC)</label>
+          <label for="prikey">Signing password (local WASM)</label>
+          <span class="field-hint">Testnet seed password: <span class="field-example">hip25test</span>. Never sent to RPC — only derives the key that signs txs.</span>
           <input id="prikey" type="password" placeholder="hip25test" autocomplete="off" />
         </div>
         <div>
+          <label for="signAddress">Signing address (from password)</label>
+          <span class="field-hint">Must match portfolio address and hold enough HAC for origination burn + tx fee.</span>
+          <input id="signAddress" readonly placeholder="Enter password to resolve…" />
+        </div>
+        <div>
           <label for="chainId">Chain ID</label>
+          <span class="field-hint">Testnet = <span class="field-example">1</span> · Mainnet = <span class="field-example">0</span>. Synced automatically from the node.</span>
           <input id="chainId" value="1" />
         </div>
       </div>
@@ -172,64 +210,80 @@
         <button class="btn-primary" id="btnLoad">Load portfolio</button>
         <button class="btn-ghost" id="btnRefresh">Refresh</button>
       </div>
+      <div class="meta" id="addressWarn" style="margin-top:0.5rem"></div>
       <div class="meta" id="sdkStatus" style="margin-top:0.75rem">WASM SDK: checking…</div>
     </section>
 
     <section class="panel">
-      <h2>Summary</h2>
+      <h2>Account summary</h2>
       <div class="stats" id="stats">
         <div class="stat"><div class="val" id="sHac">—</div><div class="lbl">HAC balance</div></div>
         <div class="stat"><div class="val" id="sStaked">—</div><div class="lbl">Staked HACD</div></div>
-        <div class="stat"><div class="val" id="sCooldown">—</div><div class="lbl">In cooldown</div></div>
+        <div class="stat"><div class="val" id="sCooldown">—</div><div class="lbl">HACD in cooldown</div></div>
         <div class="stat"><div class="val" id="sAccrued">—</div><div class="lbl">Accrued rewards</div></div>
         <div class="stat"><div class="val" id="sHeight">—</div><div class="lbl">Chain height</div></div>
-        <div class="stat"><div class="val" id="sPool">—</div><div class="lbl">Pool (zhu)</div></div>
-        <div class="stat"><div class="val" id="sMortgageIoU">—</div><div class="lbl">Mortgage IOU (zhu)</div></div>
+        <div class="stat"><div class="val" id="sPool">—</div><div class="lbl">Staking pool (zhu)</div></div>
+        <div class="stat"><div class="val" id="sMortgageIoU">—</div><div class="lbl">Outstanding mortgage IOU (zhu)</div></div>
         <div class="stat"><div class="val" id="sMortgageApr">—</div><div class="lbl">Mortgage APR</div></div>
       </div>
     </section>
 
     <section class="panel">
-      <h2>HIP-2 Mortgage</h2>
+      <h2>HIP-2 HACD mortgage</h2>
+      <div class="steps" style="margin-bottom:1rem">
+        <strong>Steps:</strong>
+        1) Fill testnet seed + load portfolio ·
+        2) Select HACD with status <strong>Available</strong> ·
+        3) Loan auto-fills when you select HACD (<span class="field-example">1 HACD = 1:250</span>, <span class="field-example">2 HACD = 2:250</span>) ·
+        4) <strong>Open mortgage</strong> (action 15) — needs HAC for 1% origination burn + tx fee
+      </div>
       <div class="grid-2">
         <div>
-          <label for="lendId">Lending ID (28 hex chars = 14 bytes)</label>
-          <input id="lendId" placeholder="4d01…" />
+          <label for="lendId">Lending ID</label>
+          <span class="field-hint">Unique 14-byte contract id = <span class="field-example">28 hex characters</span>. Click <strong>New lending ID</strong> for a random one.</span>
+          <input id="lendId" placeholder="4d01a2b3c4d5e6f7080910111213147a" maxlength="28" />
         </div>
         <div>
-          <label for="borrowPeriod">Borrow period T (1–20)</label>
-          <input id="borrowPeriod" type="number" min="1" max="20" value="5" />
+          <label for="borrowPeriod">Borrow period T (periods)</label>
+          <span class="field-hint">How many loan periods (1–20). On testnet each period = 10 blocks.</span>
+          <input id="borrowPeriod" type="number" min="1" max="20" value="5" title="Number of borrow periods" />
         </div>
         <div>
-          <label for="loanAmount">Loan amount (must match Σ bid-burn)</label>
-          <input id="loanAmount" placeholder="100" />
+          <label for="loanAmount">Loan amount (HAC)</label>
+          <span class="field-hint">Must equal bid-burn sum for selected HACD (updates automatically on selection).</span>
+          <input id="loanAmount" placeholder="1:250" title="HAC amount format" />
+          <span class="field-hint" id="mortgageCostHint" style="margin-top:0.35rem"></span>
         </div>
         <div>
-          <label for="ransomAmount">Ransom amount (min from contract query)</label>
-          <input id="ransomAmount" placeholder="100" />
+          <label for="ransomAmount">Ransom amount (HAC)</label>
+          <span class="field-hint">HAC paid to reclaim mortgaged HACD. Minimum from <strong>Quote min ransom</strong> or an active contract.</span>
+          <input id="ransomAmount" placeholder="1:257" title="Mortgage redemption amount" />
         </div>
       </div>
       <div class="btn-row">
-        <button class="btn-primary" id="btnMortgageOpen" disabled>Open mortgage (15)</button>
-        <button class="btn-unstake" id="btnMortgageRedeem" disabled>Redeem (16)</button>
+        <button class="btn-primary" id="btnMortgageOpen" disabled title="Action 15 — MortgageOpen">Open mortgage</button>
+        <button class="btn-unstake" id="btnMortgageRedeem" disabled title="Action 16 — MortgageRedeem">Redeem HACD</button>
         <button class="btn-ghost" id="btnMortgageQuote">Quote min ransom</button>
-        <button class="btn-ghost" id="btnCalcLoan">Calc loan from HACD</button>
+        <button class="btn-ghost" id="btnCalcLoan">Calculate loan</button>
         <button class="btn-ghost" id="btnNewLendId">New lending ID</button>
       </div>
-      <div class="meta" id="mortgageMeta" style="margin-top:0.75rem">1) Fill testnet + Load portfolio · 2) Select Available HACD · 3) Calc loan · 4) Open mortgage</div>
+      <div class="meta" id="mortgageMeta" style="margin-top:0.75rem">Redemption phase and minimum ransom appear here after a quote.</div>
       <div id="mortgageContracts" class="meta" style="margin-top:0.5rem"></div>
     </section>
 
     <section class="panel">
       <h2>Your HACD</h2>
+      <p class="field-hint" style="margin-bottom:0.75rem">
+        <strong>Available</strong> = free to stake or mortgage · <strong>Staked</strong> = earning rewards · <strong>Cooldown</strong> = unstake waiting period · <strong>Mortgaged</strong> = locked in a loan
+      </p>
       <div class="btn-row" style="margin-top:0;margin-bottom:1rem">
         <button class="btn-stake" id="btnStake" disabled>Stake selected</button>
         <button class="btn-unstake" id="btnUnstake" disabled>Unstake selected</button>
         <button class="btn-ghost" id="btnSelAll">Select all</button>
-        <button class="btn-ghost" id="btnSelNone">Clear</button>
+        <button class="btn-ghost" id="btnSelNone">Clear selection</button>
       </div>
       <div class="diamond-list" id="diamonds">
-        <div class="empty">Load your wallet to see HACD and staking badges.</div>
+        <div class="empty">Load your portfolio to see HACD and status badges.</div>
       </div>
     </section>
 
@@ -242,6 +296,7 @@
     const MAINNET_CHAIN_ID = "0";
     const TESTNET = {
       address: "1Do17BuqMj5N4EZRuquXtoCCHFZpQoHyc2",
+      password: "hip25test",
       fee: "0:247",
     };
 
@@ -250,8 +305,9 @@
     }
 
     const $ = (id) => document.getElementById(id);
-    const state = { diamonds: [], mortgageContracts: [], height: 0, selected: new Set(), wasm: null, hip25Dev: true };
+    const state = { diamonds: [], mortgageContracts: [], height: 0, selected: new Set(), wasm: null, hip25Dev: true, signAddress: "" };
     let loadRetryTimer = null;
+    let loanRefreshTimer = null;
 
     function schedulePortfolioRetry() {
       if (loadRetryTimer) return;
@@ -293,6 +349,96 @@
       el.prepend(line);
     }
 
+    function parseAccountJson(raw) {
+      if (!raw || raw.startsWith("[ERROR]")) throw new Error(raw || "account error");
+      const trimmed = raw.trim();
+      if (!trimmed.startsWith("{")) throw new Error("invalid account JSON");
+      return JSON.parse(trimmed);
+    }
+
+    function explainSubmitError(msg) {
+      if (msg.includes("loan amount must be")) {
+        return `${msg} — re-select HACD or click Calculate loan (amount scales per HACD: 1:250 each on testnet)`;
+      }
+      if (msg.includes("do hac_sub error") && msg.includes("not enough")) {
+        return `${msg} — password must match portfolio address (testnet: hip25test → ${TESTNET.address}). Load portfolio for that address.`;
+      }
+      return msg;
+    }
+
+    async function resolveSigningAddress() {
+      const pass = $("prikey").value.trim();
+      const el = $("signAddress");
+      const warn = $("addressWarn");
+      if (!pass) {
+        state.signAddress = "";
+        el.value = "";
+        warn.textContent = "";
+        return "";
+      }
+      if (!state.wasm?.create_account_by) {
+        el.value = "(rebuild WASM: scripts/build_wallet_sdk.ps1)";
+        return "";
+      }
+      try {
+        const acc = parseAccountJson(state.wasm.create_account_by(pass));
+        state.signAddress = acc.address || "";
+        el.value = state.signAddress;
+        updateAddressMismatchWarning();
+        return state.signAddress;
+      } catch (e) {
+        state.signAddress = "";
+        el.value = "";
+        warn.textContent = e.message;
+        warn.className = "meta err";
+        return "";
+      }
+    }
+
+    function updateAddressMismatchWarning() {
+      const warn = $("addressWarn");
+      const portfolio = $("address").value.trim();
+      const signer = state.signAddress;
+      if (!portfolio || !signer) {
+        warn.textContent = "";
+        return;
+      }
+      if (portfolio !== signer) {
+        warn.textContent = `Mismatch: portfolio is ${portfolio} but password signs as ${signer}. Txs will fail — use password hip25test with testnet seed address.`;
+        warn.className = "meta err";
+        return;
+      }
+      warn.textContent = "Portfolio address matches signing address.";
+      warn.className = "meta ok";
+    }
+
+    function selectedAvailableDiamonds() {
+      const byName = Object.fromEntries(state.diamonds.map((d) => [d.literal, d]));
+      return [...state.selected].filter((n) => byName[n]?.status === "Available");
+    }
+
+    function scheduleLoanRefresh() {
+      if (loanRefreshTimer) clearTimeout(loanRefreshTimer);
+      loanRefreshTimer = setTimeout(() => {
+        loanRefreshTimer = null;
+        refreshLoanForSelection().catch(() => {});
+      }, 200);
+    }
+
+    async function refreshLoanForSelection(opts = {}) {
+      const sel = selectedAvailableDiamonds();
+      const hint = $("mortgageCostHint");
+      if (!sel.length) {
+        hint.textContent = "";
+        return;
+      }
+      const p = await apiGet("query/mortgage/principal", { diamonds: sel.join(",") });
+      $("loanAmount").value = p.loan || "";
+      const fee = $("fee").value.trim() || "0";
+      hint.textContent = `${p.hacd_count || sel.length} HACD → loan ${p.loan} · origination burn (1%) ${p.origination_burn || "—"} · tx fee ${fee}`;
+      if (!opts.quiet) log(`Loan updated: ${p.loan} for ${sel.join(",")}`, "ok");
+    }
+
     async function apiGet(path, params = {}) {
       const qs = new URLSearchParams(params).toString();
       const url = `${apiBase()}/${path}${qs ? "?" + qs : ""}`;
@@ -302,7 +448,13 @@
       } catch (e) {
         throw new Error(`RPC unreachable at ${apiBase()} — run START_WALLET.bat and keep HIP25-FULLNODE open`);
       }
-      const j = await r.json();
+      const text = await r.text();
+      let j;
+      try {
+        j = JSON.parse(text);
+      } catch {
+        throw new Error(text.trim() || `RPC error ${r.status}`);
+      }
       if (j.ret !== 0) throw new Error(j.err || JSON.stringify(j));
       return j;
     }
@@ -312,8 +464,14 @@
       const url = `${apiBase()}/${path}${qs ? "?" + qs : ""}`;
       const bytes = body instanceof Uint8Array ? body : new TextEncoder().encode(body);
       const r = await fetch(url, { method: "POST", body: bytes });
-      const j = await r.json();
-      if (j.ret !== 0) throw new Error(j.err || JSON.stringify(j));
+      const text = await r.text();
+      let j;
+      try {
+        j = JSON.parse(text);
+      } catch {
+        throw new Error(text.trim() || `RPC error ${r.status}`);
+      }
+      if (j.ret !== 0) throw new Error(explainSubmitError(j.err || JSON.stringify(j)));
       return j;
     }
 
@@ -336,7 +494,7 @@
       const box = $("diamonds");
       box.innerHTML = "";
       if (!state.diamonds.length) {
-        box.innerHTML = '<div class="empty">No HACD on this address.</div>';
+        box.innerHTML = '<div class="empty">No HACD found for this address.</div>';
         return;
       }
       for (const d of state.diamonds) {
@@ -359,6 +517,7 @@
           } else state.selected.delete(d.literal);
           updateActionButtons();
           row.classList.toggle("selected", cb.checked);
+          scheduleLoanRefresh();
         };
         const info = document.createElement("div");
         const lit = document.createElement("div");
@@ -366,7 +525,7 @@
         lit.textContent = d.literal;
         const meta = document.createElement("div");
         meta.className = "meta";
-        let metaTxt = `reward ${d.accrued_reward || "0"} · min unstake h ${d.min_unstake_height ?? "—"}`;
+        let metaTxt = `reward ${d.accrued_reward || "0"} · min unstake block ${d.min_unstake_height ?? "—"}`;
         if (d.lending_id) metaTxt += ` · mortgage ${d.lending_id.slice(0, 8)}…`;
         meta.textContent = metaTxt;
         info.append(lit, meta);
@@ -432,11 +591,9 @@
     }
 
     async function calcLoanFromSelection() {
-      const sel = [...state.selected].filter((n) => state.diamonds.find((d) => d.literal === n)?.status === "Available");
+      const sel = selectedAvailableDiamonds();
       if (!sel.length) throw new Error("Select Available HACD first");
-      const p = await apiGet("query/mortgage/principal", { diamonds: sel.join(",") });
-      $("loanAmount").value = p.loan || "";
-      log(`Loan principal for ${sel.join(",")}: ${p.loan}`, "ok");
+      await refreshLoanForSelection();
     }
 
     async function loadPortfolio(opts = {}) {
@@ -473,7 +630,7 @@
       const entry = bal.list?.[0] || {};
       $("sHac").textContent = entry.hacash || "0";
 
-      const summary = await apiGet("query/staking/summary", { address: addr });
+      const summary = await apiGet("query/staking/summary", { address: addr, offset: "0", limit: "200" });
       $("sStaked").textContent = summary.staked_count ?? 0;
       $("sCooldown").textContent = summary.cooldown_count ?? 0;
       $("sAccrued").textContent = summary.total_accrued_reward || "0";
@@ -561,10 +718,31 @@
         el.textContent = "WASM SDK: ready — stake / unstake / mortgage (password stays in browser)";
         el.className = "meta ok";
         updateActionButtons();
+        await resolveSigningAddress();
       } catch (e) {
         el.textContent = `WASM SDK: ${e.message}`;
         el.className = "meta err";
       }
+    }
+
+    async function preflightMortgageOpen() {
+      const sel = selectedAvailableDiamonds();
+      if (!sel.length) throw new Error("Select Available HACD first");
+      const signer = await resolveSigningAddress();
+      if (!signer) throw new Error("Enter signing password (testnet: hip25test)");
+      const portfolio = $("address").value.trim();
+      if (portfolio && signer !== portfolio) {
+        throw new Error(`Password signs as ${signer} but portfolio is ${portfolio}. Use testnet seed + hip25test.`);
+      }
+      const p = await apiGet("query/mortgage/principal", { diamonds: sel.join(",") });
+      const loan = $("loanAmount").value.trim();
+      if (loan !== p.loan) {
+        $("loanAmount").value = p.loan || "";
+        throw new Error(`Loan corrected to ${p.loan} for ${sel.length} HACD — try again`);
+      }
+      const bal = await apiGet("query/balance", { address: signer });
+      const hac = bal.list?.[0]?.hacash || "0";
+      log(`Signer ${signer} balance ${hac} · need origination ${p.origination_burn} + fee ${$("fee").value.trim()}`, "ok");
     }
 
     async function submitStakeAction(kind) {
@@ -606,9 +784,13 @@
       $("fee").value = TESTNET.fee;
       $("chainId").value = "1";
       $("rpc").value = sdkOrigin();
-      log("Filled HIP-25 testnet seed address (enter testnet password locally)");
-      loadPortfolio().catch((e) => log(e.message, "err"));
+      if (!$("prikey").value.trim()) $("prikey").value = TESTNET.password;
+      resolveSigningAddress().then(() => loadPortfolio()).catch((e) => log(e.message, "err"));
+      log("Filled testnet seed — password hip25test, loading portfolio…");
     };
+
+    $("prikey").addEventListener("input", () => resolveSigningAddress());
+    $("address").addEventListener("input", updateAddressMismatchWarning);
 
     $("btnLoad").onclick = () => loadPortfolio().catch((e) => log(e.message, "err"));
     $("btnRefresh").onclick = () => loadPortfolio().catch((e) => log(e.message, "err"));
@@ -620,8 +802,13 @@
           state.selected.add(d.literal);
       });
       renderDiamonds();
+      scheduleLoanRefresh();
     };
-    $("btnSelNone").onclick = () => { state.selected.clear(); renderDiamonds(); };
+    $("btnSelNone").onclick = () => {
+      state.selected.clear();
+      renderDiamonds();
+      $("mortgageCostHint").textContent = "";
+    };
 
     function randomLendIdHex() {
       const bytes = new Uint8Array(14);
@@ -648,7 +835,7 @@
           height: state.height ? String(state.height) : "0",
         });
         $("ransomAmount").value = q.min_ransom || "";
-        $("mortgageMeta").textContent = `Phase: ${q.redeem_phase || "—"} · min ransom: ${q.min_ransom || "—"}`;
+        $("mortgageMeta").textContent = `Redemption phase: ${q.redeem_phase || "—"} · min ransom: ${q.min_ransom || "—"}`;
         log(`Quote: ${q.min_ransom} (${q.redeem_phase})`, "ok");
       } catch (e) {
         log(e.message, "err");
@@ -665,8 +852,8 @@
       const ts = BigInt(txTimestamp());
       let raw;
       if (kind === 15) {
-        const sel = [...state.selected].filter((n) => state.diamonds.find((d) => d.literal === n)?.status === "Available");
-        if (!sel.length) throw new Error("Select Available HACD");
+        await preflightMortgageOpen();
+        const sel = selectedAvailableDiamonds();
         const loan = $("loanAmount").value.trim();
         const bp = parseInt($("borrowPeriod").value, 10);
         if (!lendId || !loan) throw new Error("Lending ID and loan amount required");
@@ -678,7 +865,12 @@
       }
       const tx = parseSdkJson(raw);
       log(`Signed ${tx.action} ${tx.tx_hash}`);
-      const submitted = await apiPost("submit/transaction", hexToBytes(tx.tx_body));
+      let submitted;
+      try {
+        submitted = await apiPost("submit/transaction", hexToBytes(tx.tx_body));
+      } catch (e) {
+        throw new Error(explainSubmitError(e.message));
+      }
       $("prikey").value = "";
       log(`Submitted ${submitted.hash}`, "ok");
       setTimeout(loadPortfolio, 3000);
