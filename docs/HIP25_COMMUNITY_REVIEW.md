@@ -54,7 +54,7 @@ Requires **synced mainnet** `data_dir` — does **not** delete chain data.
 
 Reviewers / voters should confirm:
 
-- [ ] **Consensus:** stake/unstake rules match HIP-25 spec (min stake, cooldown, fee redirect 13%, ownership).
+- [ ] **Consensus:** stake/unstake rules match HIP-25 v2 spec (min stake, cooldown, **10% inscription protocol fee only**, idle pool burn, ownership).
 - [ ] **Mainnet safety:** dev flags (`hip25_testnet_seed`) panic at startup when `chain_id=0`.
 - [ ] **Wallet:** secrets never sent to RPC; only signed `tx_body` submitted.
 - [ ] **RPC:** loopback-only by default; public bind requires explicit `allow_public_rpc=true`.

@@ -94,7 +94,7 @@ Actions: **34** stake, **35** unstake.
 
 ## Consensus parameters (v1)
 
-- Fee share to staking pool: **13%**
+- Fee share to staking pool: **10%** (inscription protocol fees only; v2 economics)
 - `MIN_STAKE_BLOCKS = 25714`
 - `COOLDOWN_BLOCKS = 864`
 - `staking_activation_height` in `[mint]` (testnet: `1`)

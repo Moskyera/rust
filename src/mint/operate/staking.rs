@@ -27,36 +27,11 @@ pub fn staking_is_active_at_height(state: &MintState, height: u64) -> bool {
     state.staking_global().is_active_at(height)
 }
 
-/// Returns true if tx contains a HACD transfer action (kinds 5–8).
-pub fn tx_contains_diamond_transfer(tx: &dyn TransactionRead) -> bool {
-    for act in tx.actions() {
-        let k = act.kind();
-        if (5..=8).contains(&k) {
-            return true;
-        }
-    }
-    false
-}
-
+/// HIP-25 v2: split HIP-15 inscription protocol fee between staking pool and burn.
 pub fn staking_redirect_fee_zhu(fee_zhu: u64) -> (u64, u64) {
     let to_pool = fee_zhu * STAKING_FEE_SHARE_PERCENT / 100;
     let to_burn = fee_zhu - to_pool;
     (to_pool, to_burn)
-}
-
-/// HIP-25: 13% of total transfer fee → pool; remainder follows burn/miner split.
-pub fn staking_split_transfer_tx_fee(total: &Amount, burn_90: bool) -> Ret<(u64, Amount)> {
-    let total_zhu = total.to_zhu_unsafe() as u64;
-    let (to_pool, remainder_zhu) = staking_redirect_fee_zhu(total_zhu);
-    let mut miner = if remainder_zhu > 0 {
-        Amount::from_zhu(remainder_zhu as i64)?
-    } else {
-        Amount::default()
-    };
-    if burn_90 && miner.unit() > 1 {
-        miner.unit_sub(1);
-    }
-    Ok((to_pool, miner))
 }
 
 fn staking_push_event(state: &mut MintState, event: &StakingEvent) {
@@ -73,7 +48,48 @@ pub fn staking_deposit_fee(state: &mut MintState, fee_zhu: u64) {
     }
     let mut global = state.staking_global();
     global.reward_pool_zhu = Uint8::from(global.reward_pool_zhu.uint() + fee_zhu);
+    global.cumulative_deposit_zhu =
+        Uint8::from(global.cumulative_deposit_zhu.uint() + fee_zhu);
     state.set_staking_global(&global);
+}
+
+/// When no stakers exist, burn undistributed pool after `STAKING_POOL_SWEEP_BLOCKS` (HIP-11 alignment).
+pub fn staking_sweep_idle_pool(state: &mut MintState, height: u64) -> Ret<()> {
+    let mut global = state.staking_global();
+    let shares = global.total_staked_shares.uint();
+    let pool = global.reward_pool_zhu.uint();
+    if shares > 0 || pool == 0 {
+        global.zero_staker_blocks = Uint5::from(0);
+        state.set_staking_global(&global);
+        return Ok(());
+    }
+    let idle = global.zero_staker_blocks.uint() + 1;
+    global.zero_staker_blocks = Uint5::from(idle);
+    if idle < STAKING_POOL_SWEEP_BLOCKS {
+        state.set_staking_global(&global);
+        return Ok(());
+    }
+    global.reward_pool_zhu = Uint8::from(0);
+    global.zero_staker_blocks = Uint5::from(0);
+    global.cumulative_pool_burned_zhu =
+        Uint8::from(global.cumulative_pool_burned_zhu.uint() + pool);
+    state.set_staking_global(&global);
+    let mut ttcount = state.total_count();
+    ttcount.diamond_insc_burn_zhu = Uint8::from(ttcount.diamond_insc_burn_zhu.uint() + pool);
+    state.set_total_count(&ttcount);
+    staking_push_event(
+        state,
+        &StakingEvent {
+            kind: STAKING_EVENT_POOL_SWEPT,
+            height: BlockHeight::from(height),
+            diamond: DiamondName::default(),
+            staker: Address::default(),
+            unlock_height: BlockHeight::from(0),
+            reward: Amount::from_zhu(pool as i64).unwrap_or_default(),
+            shares: Uint5::from(0),
+        },
+    );
+    Ok(())
 }
 
 pub fn staking_distribute_rewards(state: &mut MintState, height: u64) -> Ret<()> {
@@ -195,6 +211,12 @@ pub fn staking_process_unlock_queue(base_state: &mut dyn State, height: u64) -> 
         if reward.is_positive() {
             let mut core_state = CoreState::wrap(base_state);
             hac_add(&mut core_state, &staker, &reward)?;
+            let mut mint_state = MintState::wrap(base_state);
+            let mut global = mint_state.staking_global();
+            let paid = reward.to_zhu_unsafe().max(0.0) as u64;
+            global.cumulative_paid_zhu =
+                Uint8::from(global.cumulative_paid_zhu.uint() + paid);
+            mint_state.set_staking_global(&global);
         }
         {
             let mut mint_state = MintState::wrap(base_state);
@@ -214,6 +236,7 @@ pub fn staking_on_block_close(base_state: &mut dyn State, height: u64) -> Ret<()
     drop(mint_state);
     {
         let mut mint_state = MintState::wrap(base_state);
+        staking_sweep_idle_pool(&mut mint_state, height)?;
         staking_distribute_rewards(&mut mint_state, height)?;
     }
     staking_process_unlock_queue(base_state, height)?;
@@ -483,10 +506,10 @@ mod staking_tests {
     }
 
     #[test]
-    fn fee_redirect_splits_13_87() {
+    fn fee_redirect_splits_10_90_inscription_protocol_only() {
         let (pool, burn) = staking_redirect_fee_zhu(1000);
-        assert_eq!(pool, 130);
-        assert_eq!(burn, 870);
+        assert_eq!(pool, 100);
+        assert_eq!(burn, 900);
     }
 
     #[test]
@@ -619,19 +642,28 @@ mod staking_tests {
     }
 
     #[test]
-    fn transfer_fee_redirect_uses_total_fee_not_fee_got() {
-        let total = Amount::from_zhu(1000).unwrap();
-        let (pool, miner) = staking_split_transfer_tx_fee(&total, false).unwrap();
-        assert_eq!(pool, 130);
-        assert_eq!(miner.to_zhu_unsafe() as u64, 870);
+    fn idle_pool_swept_to_burn_after_sweep_blocks() {
+        let (_dir, mut state) = test_state();
+        let mut mint = MintState::wrap(&mut state);
+        staking_deposit_fee(&mut mint, 5000);
+        for h in 1..=STAKING_POOL_SWEEP_BLOCKS {
+            staking_sweep_idle_pool(&mut mint, h).unwrap();
+        }
+        assert_eq!(mint.staking_global().reward_pool_zhu.uint(), 0);
+        assert_eq!(mint.staking_global().cumulative_pool_burned_zhu.uint(), 5000);
+        assert_eq!(mint.total_count().diamond_insc_burn_zhu.uint(), 5000);
     }
 
     #[test]
-    fn transfer_fee_redirect_applies_burn_90_on_remainder() {
-        let total = Amount::from_zhu(1000).unwrap();
-        let (pool, miner) = staking_split_transfer_tx_fee(&total, true).unwrap();
-        assert_eq!(pool, 130);
-        assert_eq!(miner.to_zhu_unsafe() as u64, 87);
+    fn idle_pool_not_swept_before_threshold() {
+        let (_dir, mut state) = test_state();
+        let mut mint = MintState::wrap(&mut state);
+        staking_deposit_fee(&mut mint, 3000);
+        for h in 1..STAKING_POOL_SWEEP_BLOCKS {
+            staking_sweep_idle_pool(&mut mint, h).unwrap();
+        }
+        assert_eq!(mint.staking_global().reward_pool_zhu.uint(), 3000);
+        assert_eq!(mint.staking_global().zero_staker_blocks.uint(), STAKING_POOL_SWEEP_BLOCKS - 1);
     }
 
     #[test]

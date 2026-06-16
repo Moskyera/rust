@@ -21,7 +21,7 @@ HIP-25: HACD staking (kinds 34/35), WASM wallet, mainnet security hardening
 This PR adds **HIP-25 HACD staking** to the Hacash Rust fullnode:
 
 - On-chain actions **DiamondStake (34)** and **DiamondUnstake (35)**
-- Global reward index pool, 13% fee redirect, min stake / cooldown
+- Global reward index pool, **10% inscription protocol fee redirect** (v2; no transfer-fee redirect), idle pool burn, min stake / cooldown
 - **Local WASM wallet** at `/hip25/wallet` (client-side signing only on mainnet)
 - **Security hardening** for mainnet RPC (loopback default, rate limits, origin checks, no server-side secrets on `chain_id=0`)
 

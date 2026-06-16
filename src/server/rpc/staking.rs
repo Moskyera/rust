@@ -135,6 +135,13 @@ async fn staking_global(State(ctx): State<ApiCtx>, _q: Query<QStakingGlobal>) ->
         "activation_height", global.activation_height.uint(),
         "event_count", global.event_log_tail.uint(),
         "paused", global.is_paused(),
+        "fee_share_percent", STAKING_FEE_SHARE_PERCENT,
+        "fee_sources", "inscription_protocol_only",
+        "cumulative_deposit_zhu", global.cumulative_deposit_zhu.uint(),
+        "cumulative_paid_zhu", global.cumulative_paid_zhu.uint(),
+        "cumulative_pool_burned_zhu", global.cumulative_pool_burned_zhu.uint(),
+        "zero_staker_blocks", global.zero_staker_blocks.uint(),
+        "pool_sweep_blocks", STAKING_POOL_SWEEP_BLOCKS,
     };
     api_data(data)
 }

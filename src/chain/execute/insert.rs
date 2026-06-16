@@ -124,26 +124,7 @@ pub fn do_check_insert(
         if execn > 0 { // except coinbase tx
             exec_tx_actions(!not_fast_sync, cnf.chain_id, height, blkhash, &mut sub_state, store, tx.as_read())?;
             let fee = tx.fee_got();
-            // HIP-25: redirect 13% of total HACD transfer tx fees to staking pool
-            if crate::mint::operate::tx_contains_diamond_transfer(tx.as_read()) {
-                let mut ms = crate::mint::state::MintState::wrap(&mut sub_state);
-                if crate::mint::operate::staking_is_active_at_height(&ms, height) {
-                    let (to_pool, miner_part) = crate::mint::operate::staking_split_transfer_tx_fee(
-                        tx.fee(),
-                        tx.burn_90(),
-                    )?;
-                    if to_pool > 0 {
-                        crate::mint::operate::staking_deposit_fee(&mut ms, to_pool);
-                    }
-                    if miner_part.is_positive() {
-                        alltxfee = alltxfee.add(&miner_part)?;
-                    }
-                } else {
-                    alltxfee = alltxfee.add(&fee)?;
-                }
-            } else {
-                alltxfee = alltxfee.add(&fee)?; // fee_miner_received
-            }
+            alltxfee = alltxfee.add(&fee)?; // fee_miner_received (HIP-25 v2: no transfer-fee redirect)
         }
         // deduct tx fee after exec all actions
         tx.execute(height, &mut sub_state)?; // coinbase and other tx

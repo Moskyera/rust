@@ -6,8 +6,11 @@
  * See HIP-25 for the full protocol specification.
  */
 
-/// 13% of eligible inscription protocol fees and transfer fees → reward pool
-pub const STAKING_FEE_SHARE_PERCENT: u64 = 13;
+/// 10% of HIP-15 inscription protocol fees only → reward pool (v2 economics; no transfer-fee redirect).
+pub const STAKING_FEE_SHARE_PERCENT: u64 = 10;
+
+/// Consecutive blocks with zero stakers and a non-empty pool before undistributed fees are burned.
+pub const STAKING_POOL_SWEEP_BLOCKS: u64 = 1008;
 
 /// ~3 days cooldown after unstake (1000 blocks ≈ 3.5 days per HIP-15)
 pub const COOLDOWN_BLOCKS: u64 = 864;
@@ -26,6 +29,7 @@ pub const STAKING_EVENT_STAKED: Uint1 = Uint1::from(1);
 pub const STAKING_EVENT_UNSTAKE_REQUESTED: Uint1 = Uint1::from(2);
 pub const STAKING_EVENT_UNSTAKED: Uint1 = Uint1::from(3);
 pub const STAKING_EVENT_REWARD_DISTRIBUTED: Uint1 = Uint1::from(4);
+pub const STAKING_EVENT_POOL_SWEPT: Uint1 = Uint1::from(5);
 
 /// Diamond is locked and earning rewards
 pub const DIAMOND_STATUS_STAKED: Uint1 = Uint1::from(4);
@@ -71,6 +75,9 @@ pub fn staking_event_kind_label(kind: &Uint1) -> &'static str {
     if *kind == STAKING_EVENT_REWARD_DISTRIBUTED {
         return "RewardDistributed";
     }
+    if *kind == STAKING_EVENT_POOL_SWEPT {
+        return "PoolSweptBurn";
+    }
     "unknown"
 }
 
@@ -89,6 +96,10 @@ StructFieldStruct!(GlobalStakingState,
     event_log_tail      : Uint5
     demo_min_stake_blocks : Uint5
     demo_cooldown_blocks  : Uint5
+    cumulative_deposit_zhu : Uint8
+    cumulative_paid_zhu    : Uint8
+    cumulative_pool_burned_zhu : Uint8
+    zero_staker_blocks     : Uint5
 );
 
 impl GlobalStakingState {
