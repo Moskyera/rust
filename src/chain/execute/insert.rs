@@ -110,7 +110,7 @@ pub fn do_check_insert(
 
     // ready exec
     let coinbase_tx = &*alltxs[0];
-    let mut alltxfee = Amount::default();
+    let mut miner_txfee = Amount::default();
     // check state
     let mut sub_state = fork_sub_state(prev_state.clone());
     // if init genesis status
@@ -124,17 +124,26 @@ pub fn do_check_insert(
         if execn > 0 { // except coinbase tx
             exec_tx_actions(!not_fast_sync, cnf.chain_id, height, blkhash, &mut sub_state, store, tx.as_read())?;
             let fee = tx.fee_got();
-            alltxfee = alltxfee.add(&fee)?; // fee_miner_received (HIP-25 v2: no transfer-fee redirect)
+            if fee.is_positive() {
+                let mut mint_state = MintState::wrap(&mut sub_state);
+                let redirect = crate::mint::operate::staking_is_active_at_height(&mint_state, height)
+                    && crate::mint::operate::staking_tx_qualifies_for_mint_fee_redirect(tx.as_read());
+                if redirect {
+                    crate::mint::operate::staking_deposit_mint_miner_share(&mut mint_state, &fee);
+                } else {
+                    miner_txfee = miner_txfee.add(&fee)?;
+                }
+            }
         }
         // deduct tx fee after exec all actions
         tx.execute(height, &mut sub_state)?; // coinbase and other tx
         execn += 1;
     }
     // add miner got fee
-    if alltxfee.is_positive() { // amt > 0
+    if miner_txfee.is_positive() {
         let miner = coinbase_tx.address().unwrap();
         let mut corestate = CoreState::wrap(&mut sub_state);
-        operate::hac_add(&mut corestate, &miner, &alltxfee)?;
+        operate::hac_add(&mut corestate, &miner, &miner_txfee)?;
     }
     // HIP-25: per-block staking rewards + cooldown finalization
     crate::mint::operate::staking_on_block_close(&mut sub_state, height)?;

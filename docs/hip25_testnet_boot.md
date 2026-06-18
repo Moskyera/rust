@@ -112,7 +112,7 @@ Actions: **15** mortgage open, **16** mortgage redeem.
 
 ## Consensus parameters (v1)
 
-- Fee share to staking pool: **10%** (inscription protocol fees only; v2 economics)
+- Staking economics: **v3** — **10% of HACD mint bid fee** (miner share) → stakers; inscription fees **fully burn**
 - `MIN_STAKE_BLOCKS = 25714`
 - `COOLDOWN_BLOCKS = 864`
 - `staking_activation_height` in `[mint]` (testnet: `1`)

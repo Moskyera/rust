@@ -1,3 +1,4 @@
+use crate::mint::action::ACTION_KIND_ID_DIAMOND_MINT;
 
 fn staking_accrued_zhu(global_index: &Uint8, snapshot: &Uint8) -> u64 {
     global_index.uint().saturating_sub(snapshot.uint())
@@ -27,11 +28,31 @@ pub fn staking_is_active_at_height(state: &MintState, height: u64) -> bool {
     state.staking_global().is_active_at(height)
 }
 
-/// HIP-25 v2: split HIP-15 inscription protocol fee between staking pool and burn.
-pub fn staking_redirect_fee_zhu(fee_zhu: u64) -> (u64, u64) {
-    let to_pool = fee_zhu * STAKING_FEE_SHARE_PERCENT / 100;
-    let to_burn = fee_zhu - to_pool;
-    (to_pool, to_burn)
+/// HIP-25 v3: miner-visible share of a burn_90 tx fee (10% — matches `Transaction::fee_got`).
+pub fn staking_mint_miner_share_zhu(fee_zhu: u64) -> u64 {
+    fee_zhu * STAKING_FEE_SHARE_PERCENT / 100
+}
+
+/// True when tx fee miner share should fund the staking pool (DiamondMint bid only).
+pub fn staking_tx_qualifies_for_mint_fee_redirect(tx: &dyn TransactionRead) -> bool {
+    if !tx.burn_90() {
+        return false;
+    }
+    for act in tx.actions() {
+        if act.kind() == ACTION_KIND_ID_DIAMOND_MINT {
+            return true;
+        }
+    }
+    false
+}
+
+/// Deposit HACD mint miner-share into the staking reward pool (v3).
+pub fn staking_deposit_mint_miner_share(state: &mut MintState, fee: &Amount) {
+    if !fee.is_positive() {
+        return;
+    }
+    let zhu = fee.to_zhu_unsafe().max(0.0) as u64;
+    staking_deposit_fee(state, zhu);
 }
 
 fn staking_push_event(state: &mut MintState, event: &StakingEvent) {
@@ -75,7 +96,7 @@ pub fn staking_sweep_idle_pool(state: &mut MintState, height: u64) -> Ret<()> {
         Uint8::from(global.cumulative_pool_burned_zhu.uint() + pool);
     state.set_staking_global(&global);
     let mut ttcount = state.total_count();
-    ttcount.diamond_insc_burn_zhu = Uint8::from(ttcount.diamond_insc_burn_zhu.uint() + pool);
+    ttcount.hacd_bid_burn_zhu = Uint8::from(ttcount.hacd_bid_burn_zhu.uint() + pool);
     state.set_total_count(&ttcount);
     staking_push_event(
         state,
@@ -506,10 +527,9 @@ mod staking_tests {
     }
 
     #[test]
-    fn fee_redirect_splits_10_90_inscription_protocol_only() {
-        let (pool, burn) = staking_redirect_fee_zhu(1000);
-        assert_eq!(pool, 100);
-        assert_eq!(burn, 900);
+    fn mint_miner_share_is_ten_percent_of_bid_fee() {
+        assert_eq!(staking_mint_miner_share_zhu(2300), 230);
+        assert_eq!(staking_mint_miner_share_zhu(1000), 100);
     }
 
     #[test]
@@ -651,7 +671,7 @@ mod staking_tests {
         }
         assert_eq!(mint.staking_global().reward_pool_zhu.uint(), 0);
         assert_eq!(mint.staking_global().cumulative_pool_burned_zhu.uint(), 5000);
-        assert_eq!(mint.total_count().diamond_insc_burn_zhu.uint(), 5000);
+        assert_eq!(mint.total_count().hacd_bid_burn_zhu.uint(), 5000);
     }
 
     #[test]

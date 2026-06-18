@@ -6,8 +6,14 @@
  * See HIP-25 for the full protocol specification.
  */
 
-/// 10% of HIP-15 inscription protocol fees only → reward pool (v2 economics; no transfer-fee redirect).
+/// HIP-25 v3: HACD mint bid fee miner share (`fee_got` on DiamondMint) → reward pool when staking active.
 pub const STAKING_FEE_SHARE_PERCENT: u64 = 10;
+
+/// On-chain economics label returned by staking global RPC.
+pub const STAKING_ECONOMICS_VERSION: &str = "v3";
+
+/// v3 fee source identifier for RPC (`fee_sources` field).
+pub const STAKING_FEE_SOURCES: &str = "hacd_mint_miner_share";
 
 /// Consecutive blocks with zero stakers and a non-empty pool before undistributed fees are burned.
 pub const STAKING_POOL_SWEEP_BLOCKS: u64 = 1008;

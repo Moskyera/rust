@@ -1,3 +1,7 @@
+# HIP-25 v2 Economics (superseded by v3)
+
+> **Note:** Mainnet/community target is **v3** (`docs/HIP25_ECONOMICS_V3.md`) — inscription fee redirect replaced by HACD mint miner-share redirect for supply-neutral staking.
+
 # HIP-25 v2 Economics (response to HIP-11 / jojoin review)
 
 **Context:** [hacash/rust#13](https://github.com/hacash/rust/pull/13#issuecomment-4714088187) — any redistribution of HAC that would otherwise burn requires long-term community consideration (HIP-11). HIP-2 (mortgage + repay principal+interest) is the reference model for HAC liquidity from HACD.

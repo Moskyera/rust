@@ -22,6 +22,7 @@ use crate::core::state::*;
 use crate::protocol::{self, *};
 use crate::protocol::transaction::*;
 use crate::mint::checker::*;
+use crate::mint::state::MintState;
 
 use super::roller;
 use super::roller::*;
