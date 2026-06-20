@@ -25,9 +25,11 @@ Each layer of the architecture has independent functions and responsibilities fo
 7. [Miner] Miner - block construction and mining, diamond mining, transaction memory pool, mining pool server, mining pool worker, etc.
 
 
-### HIP-25 HACD staking (community review)
+### HIP-25 HACD staking (reference implementation)
 
-**Branch:** [`hip-25-staking`](https://github.com/Moskyera/rust/tree/hip-25-staking) · **Release:** [`v0.1.0-hip25-mainnet`](https://github.com/Moskyera/rust/releases/tag/v0.1.0-hip25-mainnet) · **Audits:** 5/5 PASS @ `a798094`
+**Branch:** [`hip-25-staking`](https://github.com/Moskyera/rust/tree/hip-25-staking) · **Tag:** `v0.1.0-hip25-reference` · **Audits:** 5/5 PASS @ `a798094`
+
+> **Note:** Official Hacash development is on [fullnodedev](https://github.com/hacash/fullnodedev) → [fullnode](https://github.com/hacash/fullnode/releases). This fork is a **tested reference** for HIP-25 spec review and a future port — not the canonical mainnet merge target for legacy [hacash/rust](https://github.com/hacash/rust).
 
 | Mode | Launcher | Port | Notes |
 |------|----------|------|-------|
@@ -39,9 +41,9 @@ Each layer of the architecture has independent functions and responsibilities fo
 powershell -ExecutionPolicy Bypass -File scripts\BUILD_MAINNET_RELEASE.ps1
 ```
 
-**Community review / voting:** [docs/HIP25_COMMUNITY_REVIEW.md](docs/HIP25_COMMUNITY_REVIEW.md)  
-**Upstream PR (copy-paste body):** [docs/UPSTREAM_PR.md](docs/UPSTREAM_PR.md)  
-**Open PR to official repo:** https://github.com/hacash/rust/compare/main...Moskyera:rust:hip-25-staking?expand=1
+**Spec:** [docs/HIP25_SPEC.md](docs/HIP25_SPEC.md) · **Roadmap:** [docs/HIP25_ROADMAP.md](docs/HIP25_ROADMAP.md)  
+**Community review:** [docs/HIP25_COMMUNITY_REVIEW.md](docs/HIP25_COMMUNITY_REVIEW.md)  
+**Discussion PR:** https://github.com/hacash/rust/pull/13
 
 Config template: `hacash_mainnet_hip25.config.ini.example` (`chain_id=0`, loopback RPC, client WASM signing only).
 

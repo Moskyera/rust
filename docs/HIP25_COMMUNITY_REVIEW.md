@@ -1,9 +1,12 @@
 # HIP-25 — Community Review & Voting Guide
 
-**Proposal:** Merge HIP-25 HACD staking (actions 34/35) + local WASM wallet into Hacash Rust fullnode.  
+**Proposal:** HIP-25 HACD staking (actions 34/35) — **reference implementation** for spec review and future **fullnodedev** port.  
 **Fork:** https://github.com/Moskyera/rust/tree/hip-25-staking  
-**Release tag:** `v0.1.0-hip25-mainnet`  
+**Reference tag:** `v0.1.0-hip25-reference`  
+**Formal spec:** [HIP25_SPEC.md](./HIP25_SPEC.md) · **Roadmap:** [HIP25_ROADMAP.md](./HIP25_ROADMAP.md)  
 **Audit status:** 5 independent security audits — **PASS** (local mainnet wallet model)
+
+> Canonical mainnet path is [hacash/fullnodedev](https://github.com/hacash/fullnodedev) → [hacash/fullnode](https://github.com/hacash/fullnode/releases), not legacy `hacash/rust`. PR #13 is for **discussion**, not assumed merge.
 
 ---
 
@@ -63,14 +66,14 @@ Reviewers / voters should confirm:
 
 ---
 
-## Upstream merge
+## Discussion PR & mainline path
 
-Open PR to official repo using prepared body:
+**Open discussion PR:** https://github.com/hacash/rust/pull/13  
+**PR body (v3 + reference status):** [docs/UPSTREAM_PR.md](./UPSTREAM_PR.md)  
+**Maintainer outreach:** [docs/JOJOIN_OUTREACH.md](./JOJOIN_OUTREACH.md)  
+**Community post:** [docs/HIP25_COMMUNITY_POST.md](./HIP25_COMMUNITY_POST.md)
 
-**→ [docs/UPSTREAM_PR.md](./UPSTREAM_PR.md)** (copy-paste PR description)
-
-**One-click compare:**  
-https://github.com/hacash/rust/compare/main...Moskyera:rust:hip-25-staking?expand=1
+Next step for mainnet: port to **fullnodedev** after maintainer alignment (see roadmap).
 
 ---
 
